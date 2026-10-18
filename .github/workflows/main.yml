@@ -29,14 +29,16 @@ jobs:
           cp -r android ../
           cd ..
           rm -rf temp_build
-          flutter pub add google_mlkit_document_scanner google_mlkit_text_recognition open_file path_provider pdf share_plus
+          flutter pub add google_mlkit_document_scanner:^0.4.0 google_mlkit_text_recognition:^0.13.0 open_file:^3.3.2 path_provider:^2.1.2 pdf:^3.10.8 share_plus:^9.0.0
 
-      - name: Set App Name to AN Scan
+      - name: Configure Android SDK & App Label
         run: |
           sed -i 's/android:label=".*"/android:label="AN Scan"/' android/app/src/main/AndroidManifest.xml || true
+          sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 35/g' android/app/build.gradle || true
+          sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 21/g' android/app/build.gradle || true
 
-      - name: Build Release APK with Android SDK 35
-        run: flutter build apk --release --dart-define=flutter.compileSdkVersion=35 --dart-define=flutter.minSdkVersion=21 || flutter build apk --release
+      - name: Build Release APK
+        run: flutter build apk --release
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
