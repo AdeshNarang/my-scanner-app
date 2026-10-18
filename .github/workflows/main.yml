@@ -31,14 +31,26 @@ jobs:
           rm -rf temp_build
           flutter pub add google_mlkit_document_scanner:^0.4.0 google_mlkit_text_recognition:^0.13.0 open_file:^3.3.2 path_provider:^2.1.2 pdf:^3.10.8 share_plus:^9.0.0
 
-      - name: Configure Android SDK & App Label
+      - name: Configure Android SDK, App Label & ProGuard
         run: |
           sed -i 's/android:label=".*"/android:label="AN Scan"/' android/app/src/main/AndroidManifest.xml || true
           sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 35/g' android/app/build.gradle || true
           sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 21/g' android/app/build.gradle || true
+          
+          # Add rules to prevent R8 from halting on optional ML Kit language modules
+          mkdir -p android/app
+          cat << 'EOF' >> android/app/proguard-rules.pro
+          -dontwarn com.google.mlkit.vision.text.**
+          -keep class com.google.mlkit.vision.text.** { *; }
+          -dontwarn com.google.android.gms.**
+          -keep class com.google.android.gms.** { *; }
+          EOF
+          
+          # Instruct Gradle to use the proguard-rules file for release
+          sed -i '/buildTypes {/,/}/ s/signingConfig = signingConfigs.debug/signingConfig = signingConfigs.debug\n            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"/' android/app/build.gradle || true
 
       - name: Build Release APK
-        run: flutter build apk --release
+        run: flutter build apk --release --no-shrink
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
