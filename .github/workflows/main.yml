@@ -18,11 +18,23 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.x'
+          flutter-version: '3.24.x'
           channel: 'stable'
 
-      - name: Install dependencies
-        run: flutter pub get
+      - name: Initialize Complete Flutter Project
+        run: |
+          mkdir temp_build
+          cd temp_build
+          flutter create --org com.example --project-name my_scanner_app .
+          cp -r android ../
+          cd ..
+          rm -rf temp_build
+          flutter pub add google_mlkit_document_scanner open_file path_provider
+
+      - name: Configure Android SDK Version
+        run: |
+          sed -i 's/minSdkVersion = flutter.minSdkVersion/minSdkVersion = 21/g' android/app/build.gradle || true
+          sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 21/g' android/app/build.gradle || true
 
       - name: Build Release APK
         run: flutter build apk --release
