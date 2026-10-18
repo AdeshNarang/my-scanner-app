@@ -39,28 +39,30 @@ class _ScannerHomePageState extends State<ScannerHomePage> {
     try {
       final scanner = DocumentScanner(
         options: DocumentScannerOptions(
-          documentFormat: DocumentFormat.pdf,
+          documentFormats: {DocumentFormat.pdf, DocumentFormat.jpeg},
           mode: ScannerMode.full,
-          isGalleryImportAllowed: true,
+          isGalleryImport: true,
           pageLimit: 25,
         ),
       );
 
       final result = await scanner.scanDocument();
-      final pdfPath = result.pdf?.pageCount != null && result.pdf?.pageCount != 0
-          ? result.pdf?.pdfPath
-          : null;
+      final pdfUri = result.pdf?.uri;
 
-      if (pdfPath != null) {
+      if (pdfUri != null && pdfUri.isNotEmpty) {
+        final rawPath = Uri.parse(pdfUri).path;
         final dir = await getApplicationDocumentsDirectory();
         final timestamp = DateTime.now().millisecondsSinceEpoch;
         final newFile = File('${dir.path}/Scan_$timestamp.pdf');
-        await File(pdfPath).copy(newFile.path);
+        
+        await File(rawPath).copy(newFile.path);
         _loadSavedFiles();
       }
+      
+      await scanner.close();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Scanner cancelled or error: $e')),
+        SnackBar(content: Text('Scanner error: $e')),
       );
     }
   }
