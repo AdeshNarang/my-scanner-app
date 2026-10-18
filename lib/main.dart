@@ -1,7 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
-import 'dart:ui' as ui;
 import 'package:archive/archive.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -12,7 +10,6 @@ import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 
 void main() {
@@ -256,7 +253,7 @@ class _ANHomeScreenState extends State<ANHomeScreen> with SingleTickerProviderSt
     }
   }
 
-  // --- FEATURE: Save as Word Doc (.docx) ---
+  // FEATURE: Save as Word Doc (.docx)
   Future<void> _exportAsWordDoc(ScannedDocument doc) async {
     setState(() => _isProcessing = true);
     try {
@@ -308,7 +305,7 @@ class _ANHomeScreenState extends State<ANHomeScreen> with SingleTickerProviderSt
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Saved as Word doc: ${doc.title}.docx'),
-          action: SnackBarAction(label: 'Open / Share', onPressed: () => Share.shareXFiles([XFile(docxFile.path)])),
+          action: SnackBarAction(label: 'Share', onPressed: () => Share.shareXFiles([XFile(docxFile.path)])),
         ),
       );
     } catch (e) {
@@ -318,7 +315,7 @@ class _ANHomeScreenState extends State<ANHomeScreen> with SingleTickerProviderSt
     }
   }
 
-  // --- FEATURE: Compress PDF ---
+  // FEATURE: Compress PDF
   Future<void> _compressPdf(ScannedDocument doc) async {
     setState(() => _isProcessing = true);
     try {
@@ -345,7 +342,7 @@ class _ANHomeScreenState extends State<ANHomeScreen> with SingleTickerProviderSt
     }
   }
 
-  // --- FEATURE: Save Pages as JPEG ---
+  // FEATURE: Save Pages as JPEG
   Future<void> _savePagesAsJpeg(ScannedDocument doc) async {
     final dir = await getApplicationDocumentsDirectory();
     int count = 0;
@@ -362,7 +359,7 @@ class _ANHomeScreenState extends State<ANHomeScreen> with SingleTickerProviderSt
     );
   }
 
-  // --- FEATURE: Combine Multiple Files ---
+  // FEATURE: Combine Multiple Files
   Future<void> _combineFiles() async {
     if (_allDocs.length < 2) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Need at least 2 scans to combine!')));
@@ -446,7 +443,7 @@ class _ANHomeScreenState extends State<ANHomeScreen> with SingleTickerProviderSt
     }
   }
 
-  // --- ADOBE SCAN DARK 3-DOT ACTION SHEET ---
+  // ADOBE-STYLE DARK 3-DOT ACTION SHEET
   void _showAdobeActionSheet(ScannedDocument doc) {
     showModalBottomSheet(
       context: context,
@@ -537,10 +534,10 @@ class _ANHomeScreenState extends State<ANHomeScreen> with SingleTickerProviderSt
                   ),
                   ListTile(
                     leading: const Icon(Icons.print_outlined, color: Colors.white70),
-                    title: const Text('Print'),
+                    title: const Text('Print / System Viewer'),
                     onTap: () {
                       Navigator.pop(context);
-                      Printing.layoutPdf(onLayout: (format) => doc.file.readAsBytes());
+                      OpenFile.open(doc.file.path);
                     },
                   ),
                   ListTile(
@@ -574,7 +571,7 @@ class _ANHomeScreenState extends State<ANHomeScreen> with SingleTickerProviderSt
     );
   }
 
-  // --- FEATURE: Fill & Sign (Signature Pad) ---
+  // FEATURE: Fill & Sign (Signature Pad)
   void _showSignatureDialog(ScannedDocument doc) {
     List<Offset?> points = [];
     showDialog(
@@ -816,7 +813,6 @@ class _ANHomeScreenState extends State<ANHomeScreen> with SingleTickerProviderSt
             ),
         ],
       ),
-      // Adobe-Style Expandable Bottom Floating Action Menu
       floatingActionButton: FloatingActionButton(
         backgroundColor: const Color(0xFF0D9488),
         foregroundColor: Colors.white,
