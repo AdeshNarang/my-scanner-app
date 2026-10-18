@@ -17,6 +17,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const ANScanApp());
 }
 
@@ -31,9 +32,9 @@ class ANScanApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.light,
-        scaffoldBackgroundColor: const Color(0xFFF8FAFC),
+        scaffoldBackgroundColor: Colors.white,
         colorScheme: const ColorScheme.light(
-          primary: Color(0xFF008080), // Adobe Classic Teal
+          primary: Color(0xFF008080), // Classic Adobe Teal
           secondary: Color(0xFF0F172A),
           surface: Colors.white,
           onSurface: Color(0xFF0F172A),
@@ -108,7 +109,6 @@ class _ANHomeScreenState extends State<ANHomeScreen> with SingleTickerProviderSt
   List<ScannedDocument> _allDocs = [];
   String _searchQuery = '';
   late TabController _tabController;
-  bool _isProcessing = false;
   final ImagePicker _picker = ImagePicker();
 
   @override
@@ -119,103 +119,105 @@ class _ANHomeScreenState extends State<ANHomeScreen> with SingleTickerProviderSt
   }
 
   Future<void> _loadDocuments() async {
-    final dir = await getApplicationDocumentsDirectory();
-    final pdfFiles = dir.listSync().whereType<File>().where((f) => f.path.endsWith('.pdf')).toList();
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final pdfFiles = dir
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.pdf'))
+          .toList();
 
-    List<ScannedDocument> loaded = [];
-    for (var file in pdfFiles) {
-      final stat = file.statSync();
-      final sizeMb = (stat.size / (1024 * 1024)).toStringAsFixed(2);
-      final rawName = file.path.split('/').last.replaceAll('.pdf', '');
-      final isId = rawName.startsWith('ID_');
+      List<ScannedDocument> loaded = [];
+      for (var file in pdfFiles) {
+        final stat = file.statSync();
+        final sizeMb = (stat.size / (1024 * 1024)).toStringAsFixed(2);
+        final rawName = file.path.split('/').last.replaceAll('.pdf', '');
+        final isId = rawName.startsWith('ID_');
 
-      final metaFile = File(file.path.replaceAll('.pdf', '.meta'));
-      List<String> pages = [];
-      if (metaFile.existsSync()) {
-        pages = metaFile.readAsLinesSync().where((p) => File(p).existsSync()).toList();
+        final metaFile = File(file.path.replaceAll('.pdf', '.meta'));
+        List<String> pages = [];
+        if (metaFile.existsSync()) {
+          pages = metaFile.readAsLinesSync().where((p) => File(p).existsSync()).toList();
+        }
+
+        loaded.add(ScannedDocument(
+          file: file,
+          title: rawName,
+          modified: stat.modified,
+          sizeMb: '$sizeMb MB',
+          pageImagePaths: pages,
+          isIdCard: isId,
+        ));
       }
 
-      loaded.add(ScannedDocument(
-        file: file,
-        title: rawName,
-        modified: stat.modified,
-        sizeMb: '$sizeMb MB',
-        pageImagePaths: pages,
-        isIdCard: isId,
-      ));
-    }
-
-    loaded.sort((a, b) => b.modified.compareTo(a.modified));
-    if (mounted) setState(() => _allDocs = loaded);
+      loaded.sort((a, b) => b.modified.compareTo(a.modified));
+      if (mounted) setState(() => _allDocs = loaded);
+    } catch (_) {}
   }
 
-  Future<String?> _promptTextInput(String title, String label, String defaultValue) async {
-    final controller = TextEditingController(text: defaultValue);
-    return showDialog<String>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: Colors.white,
-          title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
-            decoration: InputDecoration(
-              labelText: label,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context, null), child: const Text('Cancel')),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF008080)),
-              onPressed: () => Navigator.pop(context, controller.text.trim()),
-              child: const Text('OK', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            ),
-          ],
-        );
-      },
+  // Robust Normalizer: Converts raw photos/HEIC to clean, standardized JPEG
+  Future<String> _normalizeToStandardJpg(String inputPath, int index) async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final targetPath = '${dir.path}/page_norm_${DateTime.now().millisecondsSinceEpoch}_$index.jpg';
+      final fileBytes = await File(inputPath).readAsBytes();
+
+      final decoded = img.decodeImage(fileBytes);
+      if (decoded != null) {
+        final jpgBytes = img.encodeJpg(decoded, quality: 95);
+        await File(targetPath).writeAsBytes(jpgBytes);
+        return targetPath;
+      }
+    } catch (_) {}
+    return inputPath;
+  }
+
+  // Opens Document Studio IMMEDIATELY after selecting or snapping
+  void _openStudioWithImages(List<String> rawPaths, {required bool isIdMode}) async {
+    if (rawPaths.isEmpty) return;
+
+    List<String> cleanPaths = [];
+    for (int i = 0; i < rawPaths.length; i++) {
+      cleanPaths.add(await _normalizeToStandardJpg(rawPaths[i], i));
+    }
+
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ANPreSaveStudio(
+          initialImages: cleanPaths,
+          isIdMode: isIdMode,
+          onSaved: _loadDocuments,
+        ),
+      ),
     );
   }
 
-  // --- FULL SENSOR ULTRA-HD CAPTURE (Hardware Camera Pipeline) ---
   Future<void> _startUltraHdCamera() async {
     try {
-      final XFile? photo = await _picker.pickImage(
-        source: ImageSource.camera,
-        imageQuality: 100, // Maximum hardware clarity, uncompressed ISP output
-      );
-
+      final XFile? photo = await _picker.pickImage(source: ImageSource.camera, imageQuality: 100);
       if (photo != null) {
-        await _processCapturedPhotos([photo.path], isIdMode: false, prefix: 'AN_UltraHD');
+        _openStudioWithImages([photo.path], isIdMode: false);
       }
-    } catch (e) {
-      if (!e.toString().contains('cancelled') && !e.toString().contains('Canceled')) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ultra-HD Camera: $e')));
-      }
-    }
+    } catch (_) {}
   }
 
-  // --- GALLERY BATCH IMPORT (High-Res Photos) ---
   Future<void> _importFromGallery() async {
     try {
-      final List<XFile> images = await _picker.pickMultiImage(imageQuality: 100);
-      if (images.isNotEmpty) {
-        await _processCapturedPhotos(images.map((e) => e.path).toList(), isIdMode: false, prefix: 'AN_Gallery');
+      final List<XFile> photos = await _picker.pickMultiImage(imageQuality: 100);
+      if (photos.isNotEmpty) {
+        _openStudioWithImages(photos.map((e) => e.path).toList(), isIdMode: false);
       }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Import error: $e')));
-    }
+    } catch (_) {}
   }
 
-  // --- STANDARD ML SCANNER (Auto Edge Detection Mode) ---
   Future<void> _startMLScan({required bool isIdMode}) async {
     try {
       final scanner = DocumentScanner(
         options: DocumentScannerOptions(
           documentFormat: DocumentFormat.jpeg,
-          mode: ScannerMode.full,
+          mode: ScannerMode.full, // Native preview with "Original" filter option
           isGalleryImport: true,
           pageLimit: isIdMode ? 2 : 50,
         ),
@@ -225,133 +227,9 @@ class _ANHomeScreenState extends State<ANHomeScreen> with SingleTickerProviderSt
       await scanner.close();
 
       if (result.images.isNotEmpty) {
-        await _processCapturedPhotos(result.images, isIdMode: isIdMode, prefix: isIdMode ? 'ID_Card' : 'Doc');
+        _openStudioWithImages(result.images, isIdMode: isIdMode);
       }
-    } catch (e) {
-      if (!e.toString().contains('cancelled') && !e.toString().contains('Canceled')) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Scan: $e')));
-      }
-    }
-  }
-
-  // --- HIGH-FIDELITY PDF BUILDER (Lossless DPI Preservation) ---
-  Future<void> _processCapturedPhotos(List<String> rawPaths, {required bool isIdMode, required String prefix}) async {
-    final chosenName = await _promptTextInput(
-      'Save Document',
-      'File Name',
-      '${prefix}_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}',
-    );
-    if (chosenName == null || chosenName.isEmpty) return;
-
-    setState(() => _isProcessing = true);
-
-    try {
-      final dir = await getApplicationDocumentsDirectory();
-      List<String> persistentPages = [];
-
-      for (int i = 0; i < rawPaths.length; i++) {
-        final dest = '${dir.path}/${chosenName}_page_$i.jpg';
-        await File(rawPaths[i]).copy(dest);
-        persistentPages.add(dest);
-      }
-
-      final pdfDoc = pw.Document();
-
-      if (isIdMode && persistentPages.length > 1) {
-        final img1 = pw.MemoryImage(await File(persistentPages[0]).readAsBytes());
-        final img2 = pw.MemoryImage(await File(persistentPages[1]).readAsBytes());
-        pdfDoc.addPage(
-          pw.Page(
-            pageFormat: PdfPageFormat.a4,
-            margin: const pw.EdgeInsets.all(32),
-            build: (context) => pw.Column(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
-              children: [
-                pw.Container(height: 310, child: pw.Image(img1, fit: pw.BoxFit.contain)),
-                pw.Divider(thickness: 1, color: PdfColors.grey400),
-                pw.Container(height: 310, child: pw.Image(img2, fit: pw.BoxFit.contain)),
-              ],
-            ),
-          ),
-        );
-      } else {
-        // Embed raw, uncompressed bytes into standard A4 containers to preserve original DPI
-        for (final path in persistentPages) {
-          final imgBytes = await File(path).readAsBytes();
-          final imageProvider = pw.MemoryImage(imgBytes);
-          pdfDoc.addPage(
-            pw.Page(
-              pageFormat: PdfPageFormat.a4,
-              margin: pw.EdgeInsets.zero,
-              build: (context) => pw.Center(
-                child: pw.Image(imageProvider, fit: pw.BoxFit.contain),
-              ),
-            ),
-          );
-        }
-      }
-
-      final pdfFile = File('${dir.path}/$chosenName.pdf');
-      await pdfFile.writeAsBytes(await pdfDoc.save());
-
-      final metaFile = File('${dir.path}/$chosenName.meta');
-      await metaFile.writeAsString(persistentPages.join('\n'));
-
-      await _loadDocuments();
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Save error: $e')));
-    } finally {
-      if (mounted) setState(() => _isProcessing = false);
-    }
-  }
-
-  Future<void> _compressPdf(ScannedDocument doc) async {
-    setState(() => _isProcessing = true);
-    try {
-      final pdfDoc = pw.Document();
-      for (final p in doc.pageImagePaths) {
-        final originalBytes = await File(p).readAsBytes();
-        final decoded = img.decodeImage(originalBytes);
-        if (decoded != null) {
-          final resized = img.copyResize(decoded, width: (decoded.width * 0.7).round());
-          final compressedBytes = img.encodeJpg(resized, quality: 65);
-          pdfDoc.addPage(
-            pw.Page(
-              pageFormat: PdfPageFormat.a4,
-              build: (context) => pw.Center(child: pw.Image(pw.MemoryImage(compressedBytes), fit: pw.BoxFit.contain)),
-            ),
-          );
-        }
-      }
-
-      final dir = await getApplicationDocumentsDirectory();
-      final compressedFile = File('${dir.path}/${doc.title}_Compressed.pdf');
-      await compressedFile.writeAsBytes(await pdfDoc.save());
-      await _loadDocuments();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Document successfully compressed!')));
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Compress failed: $e')));
-    } finally {
-      if (mounted) setState(() => _isProcessing = false);
-    }
-  }
-
-  Future<void> _saveToDevice(ScannedDocument doc) async {
-    try {
-      Directory? downloadDir = Directory('/storage/emulated/0/Download/AN_Scan');
-      if (!await downloadDir.exists()) {
-        await downloadDir.create(recursive: true);
-      }
-      final target = File('${downloadDir.path}/${doc.title}.pdf');
-      await doc.file.copy(target.path);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Saved to: Download/AN_Scan/${doc.title}.pdf')),
-        );
-      }
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Device save error: $e')));
-    }
+    } catch (_) {}
   }
 
   void _showCaptureSelector() {
@@ -369,8 +247,8 @@ class _ANHomeScreenState extends State<ANHomeScreen> with SingleTickerProviderSt
               const SizedBox(height: 12),
               ListTile(
                 leading: const Icon(Icons.camera_enhance, color: Color(0xFF008080), size: 28),
-                title: const Text('Ultra-HD Camera (Maximum Quality)', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text('Direct full-sensor capture with stock phone ISP & HDR'),
+                title: const Text('Ultra-HD Camera (Highest Clarity)', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('Stock sensor clarity with full ISP post-processing'),
                 onTap: () {
                   Navigator.pop(context);
                   _startUltraHdCamera();
@@ -378,8 +256,8 @@ class _ANHomeScreenState extends State<ANHomeScreen> with SingleTickerProviderSt
               ),
               ListTile(
                 leading: const Icon(Icons.document_scanner, color: Colors.blueAccent, size: 28),
-                title: const Text('Quick Auto-Crop Scanner', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text('Multi-page edge detection & perspective flattening'),
+                title: const Text('Auto-Crop Scanner', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('Multi-page edge detection & perspective alignment'),
                 onTap: () {
                   Navigator.pop(context);
                   _startMLScan(isIdMode: false);
@@ -388,7 +266,7 @@ class _ANHomeScreenState extends State<ANHomeScreen> with SingleTickerProviderSt
               ListTile(
                 leading: const Icon(Icons.badge_outlined, color: Colors.orangeAccent, size: 28),
                 title: const Text('ID Card (2-in-1 Stacked)', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text('Front & back stacked cleanly on one single A4 page'),
+                subtitle: const Text('Snap front and back, stacks vertically on one sheet'),
                 onTap: () {
                   Navigator.pop(context);
                   _startMLScan(isIdMode: true);
@@ -397,7 +275,7 @@ class _ANHomeScreenState extends State<ANHomeScreen> with SingleTickerProviderSt
               ListTile(
                 leading: const Icon(Icons.photo_library_outlined, color: Colors.green, size: 28),
                 title: const Text('Import High-Res Photos (Gallery)', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text('Convert high-resolution camera photos to PDF'),
+                subtitle: const Text('Directly convert multiple camera photos into PDF'),
                 onTap: () {
                   Navigator.pop(context);
                   _importFromGallery();
@@ -408,6 +286,142 @@ class _ANHomeScreenState extends State<ANHomeScreen> with SingleTickerProviderSt
         );
       },
     );
+  }
+
+  // --- TIERED PDF COMPRESSION WITH SIZE ESTIMATES & QUALITY INFO ---
+  void _showCompressDialog(ScannedDocument doc) {
+    final currentBytes = doc.file.lengthSync();
+    final currentMb = currentBytes / (1024 * 1024);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        title: const Text('Compress PDF', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Original Size: ${currentMb.toStringAsFixed(2)} MB', style: const TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 16),
+            _compressOptionCard(
+              title: 'Low Compression',
+              subtitle: 'Best Quality (Recommended for printing & fine text)',
+              estimatedSize: '${(currentMb * 0.75).toStringAsFixed(2)} MB',
+              onTap: () {
+                Navigator.pop(context);
+                _executeCompression(doc, quality: 85, scale: 0.9, suffix: 'LowComp');
+              },
+            ),
+            const SizedBox(height: 8),
+            _compressOptionCard(
+              title: 'Medium Compression',
+              subtitle: 'Good Quality (Ideal for email & WhatsApp sharing)',
+              estimatedSize: '${(currentMb * 0.45).toStringAsFixed(2)} MB',
+              onTap: () {
+                Navigator.pop(context);
+                _executeCompression(doc, quality: 60, scale: 0.7, suffix: 'MedComp');
+              },
+            ),
+            const SizedBox(height: 8),
+            _compressOptionCard(
+              title: 'High Compression',
+              subtitle: 'Smallest File Size (Reduced image clarity)',
+              estimatedSize: '${(currentMb * 0.25).toStringAsFixed(2)} MB',
+              onTap: () {
+                Navigator.pop(context);
+                _executeCompression(doc, quality: 35, scale: 0.5, suffix: 'HighComp');
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _compressOptionCard({
+    required String title,
+    required String subtitle,
+    required String estimatedSize,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF008080))),
+                  const SizedBox(height: 2),
+                  Text(subtitle, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(color: const Color(0xFFCCFBF1), borderRadius: BorderRadius.circular(4)),
+              child: Text(estimatedSize, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF008080))),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _executeCompression(ScannedDocument doc, {required int quality, required double scale, required String suffix}) async {
+    try {
+      final pdfDoc = pw.Document();
+      for (final p in doc.pageImagePaths) {
+        final originalBytes = await File(p).readAsBytes();
+        final decoded = img.decodeImage(originalBytes);
+        if (decoded != null) {
+          final resized = img.copyResize(decoded, width: (decoded.width * scale).round());
+          final compressedBytes = img.encodeJpg(resized, quality: quality);
+          pdfDoc.addPage(
+            pw.Page(
+              pageFormat: PdfPageFormat.a4,
+              build: (context) => pw.Center(child: pw.Image(pw.MemoryImage(compressedBytes), fit: pw.BoxFit.contain)),
+            ),
+          );
+        }
+      }
+
+      final dir = await getApplicationDocumentsDirectory();
+      final compressedFile = File('${dir.path}/${doc.title}_$suffix.pdf');
+      await compressedFile.writeAsBytes(await pdfDoc.save());
+      await _loadDocuments();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('PDF compressed and saved successfully!')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Compress failed: $e')));
+    }
+  }
+
+  Future<void> _saveToDevice(ScannedDocument doc) async {
+    try {
+      Directory? downloadDir = Directory('/storage/emulated/0/Download/AN_Scan');
+      if (!await downloadDir.exists()) {
+        await downloadDir.create(recursive: true);
+      }
+      final target = File('${downloadDir.path}/${doc.title}.pdf');
+      await doc.file.copy(target.path);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Saved to: Download/AN_Scan/${doc.title}.pdf')),
+        );
+      }
+    } catch (e) {
+      // Fallback to instant share if device permissions restrict raw path writes
+      Share.shareXFiles([XFile(doc.file.path)], text: 'Export ${doc.title}');
+    }
   }
 
   void _showAdobeActionSheet(ScannedDocument doc) {
@@ -435,15 +449,6 @@ class _ANHomeScreenState extends State<ANHomeScreen> with SingleTickerProviderSt
                     },
                   ),
                   ListTile(
-                    leading: const Icon(Icons.edit_document, color: Color(0xFF008080)),
-                    title: const Text('Open Interactive Document Editor', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                    subtitle: const Text('Live text selection, reorder, rotate & markup'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => ANDocumentViewer(document: doc, onUpdated: _loadDocuments)));
-                    },
-                  ),
-                  ListTile(
                     leading: const Icon(Icons.share, color: Colors.blueAccent),
                     title: const Text('Share PDF'),
                     onTap: () {
@@ -453,18 +458,19 @@ class _ANHomeScreenState extends State<ANHomeScreen> with SingleTickerProviderSt
                   ),
                   ListTile(
                     leading: const Icon(Icons.compress, color: Colors.green),
-                    title: const Text('Compress PDF (Reduce Size)'),
+                    title: const Text('Compress PDF (Choose Level)'),
                     onTap: () {
                       Navigator.pop(context);
-                      _compressPdf(doc);
+                      _showCompressDialog(doc);
                     },
                   ),
                   ListTile(
                     leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
                     title: const Text('Delete', style: TextStyle(color: Colors.redAccent)),
-                    onTap: () {
+                    onTap: () async {
                       Navigator.pop(context);
-                      _deleteDoc(doc);
+                      if (await doc.file.exists()) await doc.file.delete();
+                      _loadDocuments();
                     },
                   ),
                 ],
@@ -474,13 +480,6 @@ class _ANHomeScreenState extends State<ANHomeScreen> with SingleTickerProviderSt
         );
       },
     );
-  }
-
-  void _deleteDoc(ScannedDocument doc) async {
-    if (await doc.file.exists()) await doc.file.delete();
-    final meta = File(doc.file.path.replaceAll('.pdf', '.meta'));
-    if (await meta.exists()) await meta.delete();
-    _loadDocuments();
   }
 
   @override
@@ -582,7 +581,14 @@ class _ANHomeScreenState extends State<ANHomeScreen> with SingleTickerProviderSt
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => ANDocumentViewer(document: doc, onUpdated: _loadDocuments)),
+                        MaterialPageRoute(
+                          builder: (_) => ANPreSaveStudio(
+                            initialImages: doc.pageImagePaths,
+                            isIdMode: doc.isIdCard,
+                            initialTitle: doc.title,
+                            onSaved: _loadDocuments,
+                          ),
+                        ),
                       );
                     },
                     child: Padding(
@@ -656,13 +662,12 @@ class _ANHomeScreenState extends State<ANHomeScreen> with SingleTickerProviderSt
   }
 }
 
-// Custom Painter for Signatures & Markups
-class SignaturePainter extends CustomPainter {
+class DrawingPainter extends CustomPainter {
   final List<Offset?> points;
   final Color color;
   final double strokeWidth;
 
-  SignaturePainter({required this.points, this.color = Colors.black, this.strokeWidth = 3.0});
+  DrawingPainter({required this.points, required this.color, required this.strokeWidth});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -679,85 +684,266 @@ class SignaturePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(SignaturePainter oldDelegate) => true;
+  bool shouldRepaint(DrawingPainter oldDelegate) => true;
 }
 
-// --- INTERACTIVE IN-DOCUMENT EDITOR WITH LIVE IN-IMAGE TEXT SELECTION ---
-class ANDocumentViewer extends StatefulWidget {
-  final ScannedDocument document;
-  final VoidCallback onUpdated;
-  const ANDocumentViewer({super.key, required this.document, required this.onUpdated});
+// --- COMPLETE PRE-SAVE & POST-SAVE INTERACTIVE STUDIO ---
+class ANPreSaveStudio extends StatefulWidget {
+  final List<String> initialImages;
+  final bool isIdMode;
+  final String? initialTitle;
+  final VoidCallback onSaved;
+
+  const ANPreSaveStudio({
+    super.key,
+    required this.initialImages,
+    required this.isIdMode,
+    this.initialTitle,
+    required this.onSaved,
+  });
 
   @override
-  State<ANDocumentViewer> createState() => _ANDocumentViewerState();
+  State<ANPreSaveStudio> createState() => _ANPreSaveStudioState();
 }
 
-class _ANDocumentViewerState extends State<ANDocumentViewer> {
+class _ANPreSaveStudioState extends State<ANPreSaveStudio> {
+  late List<String> _pages;
   int _currentPage = 0;
   final PageController _pageController = PageController();
-  List<String> _currentPages = [];
+
   List<Offset?> _drawPoints = [];
   bool _isCleanUpMode = false;
   bool _isDrawMode = false;
-  String _typedText = '';
-  List<TextLine> _liveTextLines = [];
-  Size _imageSize = Size.zero;
+
+  String _customText = '';
+  Offset _textPosition = const Offset(100, 150);
+  double _fontSize = 20.0;
+  Color _textColor = Colors.black;
 
   @override
   void initState() {
     super.initState();
-    _currentPages = List.from(widget.document.pageImagePaths);
-    _extractLiveTextForCurrentPage();
+    _pages = List.from(widget.initialImages);
   }
 
-  Future<void> _extractLiveTextForCurrentPage() async {
-    if (_currentPages.isEmpty) return;
+  Future<void> _runOcrForCurrentPage() async {
+    if (_pages.isEmpty) return;
     try {
-      final imagePath = _currentPages[_currentPage];
-      final decoded = await decodeImageFromList(await File(imagePath).readAsBytes());
-      _imageSize = Size(decoded.width.toDouble(), decoded.height.toDouble());
-
       final recognizer = TextRecognizer(script: TextRecognitionScript.latin);
-      final inputImage = InputImage.fromFilePath(imagePath);
+      final inputImage = InputImage.fromFilePath(_pages[_currentPage]);
       final recognized = await recognizer.processImage(inputImage);
       await recognizer.close();
 
-      List<TextLine> lines = [];
-      for (var block in recognized.blocks) {
-        lines.addAll(block.lines);
-      }
+      final text = recognized.text.trim();
 
-      if (mounted) {
-        setState(() {
-          _liveTextLines = lines;
-        });
-      }
-    } catch (_) {}
+      if (!mounted) return;
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.white,
+        isScrollControlled: true,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        builder: (context) {
+          return DraggableScrollableSheet(
+            initialChildSize: 0.65,
+            maxChildSize: 0.92,
+            minChildSize: 0.4,
+            expand: false,
+            builder: (context, scrollCtrl) {
+              return Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Page ${_currentPage + 1} Digitize / OCR', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            Clipboard.setData(ClipboardData(text: text));
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Copied text to clipboard!')));
+                          },
+                          icon: const Icon(Icons.copy, size: 16),
+                          label: const Text('Copy All'),
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF008080), foregroundColor: Colors.white),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 24),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        controller: scrollCtrl,
+                        child: SelectableText(
+                          text.isEmpty ? 'No readable English text detected on this page.' : text,
+                          style: const TextStyle(fontSize: 15, height: 1.6, color: Color(0xFF1E293B)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('OCR Error: $e')));
+    }
   }
 
-  void _addTextOverlay() async {
-    final controller = TextEditingController();
-    final text = await showDialog<String>(
+  void _openTextDialog() {
+    final controller = TextEditingController(text: _customText);
+    double localSize = _fontSize;
+    Color localColor = _textColor;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: Colors.white,
+          title: const Text('Add / Edit Text', style: TextStyle(fontWeight: FontWeight.bold)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: controller,
+                  decoration: const InputDecoration(hintText: 'Enter text...', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 16),
+                const Text('Text Size', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                Slider(
+                  value: localSize,
+                  min: 12.0,
+                  max: 48.0,
+                  activeColor: const Color(0xFF008080),
+                  onChanged: (val) => setDialogState(() => localSize = val),
+                ),
+                const SizedBox(height: 8),
+                const Text('Text Color', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [Colors.black, Colors.white, Colors.red, Colors.blue, const Color(0xFF008080)].map((c) {
+                    return GestureDetector(
+                      onTap: () => setDialogState(() => localColor = c),
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: c,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: localColor == c ? Colors.black : Colors.grey.shade400, width: 2),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                setState(() => _customText = '');
+                Navigator.pop(context);
+              },
+              child: const Text('Remove', style: TextStyle(color: Colors.redAccent)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF008080)),
+              onPressed: () {
+                setState(() {
+                  _customText = controller.text.trim();
+                  _fontSize = localSize;
+                  _textColor = localColor;
+                });
+                Navigator.pop(context);
+              },
+              child: const Text('Apply Text', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _saveFinalPdf() async {
+    final titleController = TextEditingController(
+      text: widget.initialTitle ?? 'Doc_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}',
+    );
+
+    final chosenName = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.white,
-        title: const Text('Add Text with Keyboard'),
+        title: const Text('Save PDF Document', style: TextStyle(fontWeight: FontWeight.bold)),
         content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(hintText: 'Enter text to place on page...'),
+          controller: titleController,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'File Name', suffixText: '.pdf', border: OutlineInputBorder()),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, null), child: const Text('Cancel')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF008080)),
-            onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('Add', style: TextStyle(color: Colors.white)),
+            onPressed: () => Navigator.pop(context, titleController.text.trim()),
+            child: const Text('Save', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
     );
-    if (text != null && text.isNotEmpty) {
-      setState(() => _typedText = text);
+
+    if (chosenName == null || chosenName.isEmpty) return;
+
+    try {
+      final pdfDoc = pw.Document();
+
+      if (widget.isIdMode && _pages.length > 1) {
+        final img1 = pw.MemoryImage(await File(_pages[0]).readAsBytes());
+        final img2 = pw.MemoryImage(await File(_pages[1]).readAsBytes());
+        pdfDoc.addPage(
+          pw.Page(
+            pageFormat: PdfPageFormat.a4,
+            margin: const pw.EdgeInsets.all(32),
+            build: (context) => pw.Column(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
+              children: [
+                pw.Container(height: 310, child: pw.Image(img1, fit: pw.BoxFit.contain)),
+                pw.Divider(thickness: 1, color: PdfColors.grey400),
+                pw.Container(height: 310, child: pw.Image(img2, fit: pw.BoxFit.contain)),
+              ],
+            ),
+          ),
+        );
+      } else {
+        for (final p in _pages) {
+          final imgBytes = await File(p).readAsBytes();
+          pdfDoc.addPage(
+            pw.Page(
+              pageFormat: PdfPageFormat.a4,
+              margin: pw.EdgeInsets.zero,
+              build: (context) => pw.Center(child: pw.Image(pw.MemoryImage(imgBytes), fit: pw.BoxFit.contain)),
+            ),
+          );
+        }
+      }
+
+      final dir = await getApplicationDocumentsDirectory();
+      final pdfFile = File('${dir.path}/$chosenName.pdf');
+      await pdfFile.writeAsBytes(await pdfDoc.save());
+
+      final metaFile = File('${dir.path}/$chosenName.meta');
+      await metaFile.writeAsString(_pages.join('\n'));
+
+      widget.onSaved();
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Document successfully saved!')));
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Save error: $e')));
     }
   }
 
@@ -766,33 +952,14 @@ class _ANDocumentViewerState extends State<ANDocumentViewer> {
       context,
       MaterialPageRoute(
         builder: (_) => ANPageOrganizerScreen(
-          pagePaths: _currentPages,
-          onPagesUpdated: (newPages) async {
+          pagePaths: _pages,
+          onPagesUpdated: (newPages) {
             setState(() {
-              _currentPages = newPages;
-              if (_currentPage >= _currentPages.length && _currentPages.isNotEmpty) {
-                _currentPage = _currentPages.length - 1;
+              _pages = newPages;
+              if (_currentPage >= _pages.length && _pages.isNotEmpty) {
+                _currentPage = _pages.length - 1;
               }
             });
-
-            final pdfDoc = pw.Document();
-            for (final path in _currentPages) {
-              final imgBytes = await File(path).readAsBytes();
-              pdfDoc.addPage(
-                pw.Page(
-                  pageFormat: PdfPageFormat.a4,
-                  margin: pw.EdgeInsets.zero,
-                  build: (context) => pw.Center(child: pw.Image(pw.MemoryImage(imgBytes), fit: pw.BoxFit.contain)),
-                ),
-              );
-            }
-            await widget.document.file.writeAsBytes(await pdfDoc.save());
-
-            final metaFile = File(widget.document.file.path.replaceAll('.pdf', '.meta'));
-            await metaFile.writeAsString(_currentPages.join('\n'));
-
-            widget.onUpdated();
-            _extractLiveTextForCurrentPage();
           },
         ),
       ),
@@ -805,21 +972,22 @@ class _ANDocumentViewerState extends State<ANDocumentViewer> {
       backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
         backgroundColor: Colors.white,
-        title: Text(widget.document.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Color(0xFF0F172A))),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text('Document Studio', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.grid_view_rounded, color: Color(0xFF008080)),
-            tooltip: 'Reorder, Rotate & Resize Pages',
-            onPressed: _openPageManager,
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF008080), foregroundColor: Colors.white),
+            onPressed: _saveFinalPdf,
+            child: const Text('Save PDF', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
-          IconButton(
-            icon: const Icon(Icons.share_outlined),
-            onPressed: () => Share.shareXFiles([XFile(widget.document.file.path)]),
-          ),
+          const SizedBox(width: 8),
         ],
       ),
-      body: _currentPages.isEmpty
-          ? Center(child: Text('No page previews found', style: TextStyle(color: Colors.grey.shade600)))
+      body: _pages.isEmpty
+          ? const Center(child: Text('No pages available'))
           : LayoutBuilder(
               builder: (context, constraints) {
                 return Stack(
@@ -832,38 +1000,54 @@ class _ANDocumentViewerState extends State<ANDocumentViewer> {
                       child: PageView.builder(
                         controller: _pageController,
                         physics: (_isCleanUpMode || _isDrawMode) ? const NeverScrollableScrollPhysics() : null,
-                        itemCount: _currentPages.length,
-                        onPageChanged: (idx) {
-                          setState(() {
-                            _currentPage = idx;
-                            _drawPoints.clear();
-                            _typedText = '';
-                          });
-                          _extractLiveTextForCurrentPage();
-                        },
+                        itemCount: _pages.length,
+                        onPageChanged: (idx) => setState(() {
+                          _currentPage = idx;
+                          _drawPoints.clear();
+                        }),
                         itemBuilder: (context, index) {
                           return Stack(
                             fit: StackFit.expand,
                             children: [
-                              Center(child: Image.file(File(_currentPages[index]), fit: BoxFit.contain)),
-                              if (!_isCleanUpMode && !_isDrawMode && _imageSize != Size.zero)
-                                _buildLiveTextOverlay(constraints.maxWidth, constraints.maxHeight),
+                              Center(child: Image.file(File(_pages[index]), fit: BoxFit.contain)),
                               if (_drawPoints.isNotEmpty)
                                 CustomPaint(
-                                  painter: SignaturePainter(
+                                  painter: DrawingPainter(
                                     points: _drawPoints,
                                     color: _isCleanUpMode ? Colors.white : Colors.blueAccent,
-                                    strokeWidth: _isCleanUpMode ? 14.0 : 3.0,
+                                    strokeWidth: _isCleanUpMode ? 20.0 : 3.5,
                                   ),
                                 ),
-                              if (_typedText.isNotEmpty)
+                              if (_customText.isNotEmpty)
                                 Positioned(
-                                  top: 100,
-                                  left: 40,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    color: Colors.yellow.withOpacity(0.85),
-                                    child: Text(_typedText, style: const TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.bold)),
+                                  left: _textPosition.dx.clamp(0.0, constraints.maxWidth - 100),
+                                  top: _textPosition.dy.clamp(0.0, constraints.maxHeight - 50),
+                                  child: GestureDetector(
+                                    onPanUpdate: (details) {
+                                      setState(() {
+                                        _textPosition = Offset(
+                                          _textPosition.dx + details.delta.dx,
+                                          _textPosition.dy + details.delta.dy,
+                                        );
+                                      });
+                                    },
+                                    onDoubleTap: _openTextDialog,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withOpacity(0.08),
+                                        border: Border.all(color: const Color(0xFF008080), width: 1),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        _customText,
+                                        style: TextStyle(
+                                          color: _textColor,
+                                          fontSize: _fontSize,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ),
                             ],
@@ -879,7 +1063,7 @@ class _ANDocumentViewerState extends State<ANDocumentViewer> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                           decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(20)),
-                          child: Text('Page ${_currentPage + 1} of ${_currentPages.length}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                          child: Text('Page ${_currentPage + 1} of ${_pages.length}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
                         ),
                       ),
                     ),
@@ -895,7 +1079,7 @@ class _ANDocumentViewerState extends State<ANDocumentViewer> {
           children: [
             IconButton(
               icon: Icon(Icons.cleaning_services, color: _isCleanUpMode ? const Color(0xFF008080) : Colors.grey),
-              tooltip: 'Cleanup / White-out',
+              tooltip: 'Clean-up (White-out)',
               onPressed: () => setState(() {
                 _isCleanUpMode = !_isCleanUpMode;
                 _isDrawMode = false;
@@ -911,13 +1095,18 @@ class _ANDocumentViewerState extends State<ANDocumentViewer> {
             ),
             IconButton(
               icon: const Icon(Icons.text_fields, color: Colors.grey),
-              tooltip: 'Type Text',
-              onPressed: _addTextOverlay,
+              tooltip: 'Type Text (Move/Resize/Color)',
+              onPressed: _openTextDialog,
+            ),
+            IconButton(
+              icon: const Icon(Icons.swap_horiz, color: Colors.grey),
+              tooltip: 'Reorder / Rotate Pages',
+              onPressed: _openPageManager,
             ),
             ElevatedButton.icon(
-              onPressed: _openPageManager,
-              icon: const Icon(Icons.swap_horiz, size: 18),
-              label: const Text('Reorder & Rotate'),
+              onPressed: _pages.isNotEmpty ? _runOcrForCurrentPage : null,
+              icon: const Icon(Icons.document_scanner, size: 16),
+              label: const Text('OCR'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF008080),
                 foregroundColor: Colors.white,
@@ -929,47 +1118,8 @@ class _ANDocumentViewerState extends State<ANDocumentViewer> {
       ),
     );
   }
-
-  Widget _buildLiveTextOverlay(double screenW, double screenH) {
-    if (_imageSize.width == 0 || _imageSize.height == 0) return const SizedBox.shrink();
-
-    final scaleX = screenW / _imageSize.width;
-    final scaleY = screenH / _imageSize.height;
-    final scale = min(scaleX, scaleY);
-
-    final renderedW = _imageSize.width * scale;
-    final renderedH = _imageSize.height * scale;
-    final offsetX = (screenW - renderedW) / 2;
-    final offsetY = (screenH - renderedH) / 2;
-
-    return Stack(
-      children: _liveTextLines.map((line) {
-        final box = line.boundingBox;
-        final left = offsetX + (box.left * scale);
-        final top = offsetY + (box.top * scale);
-        final width = max(30.0, box.width * scale);
-        final height = max(18.0, box.height * scale);
-
-        return Positioned(
-          left: left,
-          top: top,
-          width: width,
-          height: height,
-          child: SelectableText(
-            line.text,
-            style: TextStyle(
-              fontSize: max(10.0, height * 0.75),
-              color: Colors.transparent,
-              backgroundColor: Colors.teal.withOpacity(0.04),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
 }
 
-// --- FULL-PAGE MANAGEMENT SCREEN: REORDER, ROTATE & RESIZE ---
 class ANPageOrganizerScreen extends StatefulWidget {
   final List<String> pagePaths;
   final Function(List<String>) onPagesUpdated;
@@ -1005,9 +1155,7 @@ class _ANPageOrganizerScreenState extends State<ANPageOrganizerScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Document must have at least one page!')));
       return;
     }
-    setState(() {
-      _pages.removeAt(index);
-    });
+    setState(() => _pages.removeAt(index));
   }
 
   @override
@@ -1015,7 +1163,7 @@ class _ANPageOrganizerScreenState extends State<ANPageOrganizerScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Reorder & Resize Pages', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Reorder & Rotate Pages', style: TextStyle(fontWeight: FontWeight.bold)),
         actions: [
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF008080), foregroundColor: Colors.white),
@@ -1023,7 +1171,7 @@ class _ANPageOrganizerScreenState extends State<ANPageOrganizerScreen> {
               widget.onPagesUpdated(_pages);
               Navigator.pop(context);
             },
-            child: const Text('Save & Update PDF'),
+            child: const Text('Apply Changes'),
           ),
           const SizedBox(width: 8),
         ],
@@ -1052,13 +1200,13 @@ class _ANPageOrganizerScreenState extends State<ANPageOrganizerScreen> {
                 child: Image.file(File(path), width: 50, height: 65, fit: BoxFit.cover),
               ),
               title: Text('Page ${index + 1}', style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: const Text('Drag to reorder • Tap rotate for Portrait/Landscape'),
+              subtitle: const Text('Drag handle to reorder • Tap rotate for Portrait/Landscape'),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
                     icon: const Icon(Icons.rotate_right, color: Color(0xFF008080)),
-                    tooltip: 'Rotate 90° (Portrait / Landscape)',
+                    tooltip: 'Rotate 90°',
                     onPressed: () => _rotatePage(index),
                   ),
                   IconButton(
