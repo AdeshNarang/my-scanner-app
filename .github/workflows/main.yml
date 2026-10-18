@@ -31,15 +31,8 @@ jobs:
           rm -rf temp_build
           flutter pub add google_mlkit_document_scanner open_file path_provider
 
-      - name: Configure Android SDK Version
-        run: |
-          sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 35/g' android/app/build.gradle || true
-          sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 35/g' android/app/build.gradle || true
-          sed -i 's/minSdkVersion = flutter.minSdkVersion/minSdkVersion = 21/g' android/app/build.gradle || true
-          sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 21/g' android/app/build.gradle || true
-
-      - name: Build Release APK
-        run: flutter build apk --release
+      - name: Build Release APK with Android SDK 35
+        run: flutter build apk --release --dart-define=flutter.compileSdkVersion=35 --dart-define=flutter.minSdkVersion=21 || flutter build apk --release
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
