@@ -198,6 +198,17 @@ extension ScanColorFilterLabel on ScanColorFilter {
   }
 }
 
+enum ConversionDirection {
+  pdfToImage,
+  imageToPdf,
+  pdfToWord,
+  wordToPdf,
+  pdfToExcel,
+  excelToPdf,
+  wordToExcel,
+  excelToWord,
+}
+
 class OcrWordBox {
   final String text;
   final Rect boundingBox;
