@@ -9,7 +9,6 @@ import 'package:archive/archive.dart';
 import 'package:excel/excel.dart' as xls;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
@@ -39,10 +38,6 @@ void main() async {
   );
   runApp(const ANScanExecutiveApp());
 }
-
-// =============================================================================
-// 1. THEME, BRANDING & CLASSICAL LOGO EMBLEM WIDGET
-// =============================================================================
 
 const Color kNavyPrimary = Color(0xFF0F172A);
 const Color kNavySecondary = Color(0xFF1E293B);
@@ -88,8 +83,6 @@ class ANScanExecutiveApp extends StatelessWidget {
   }
 }
 
-/// Renders the finalized Classical Ivory & Bronze/Gold "AN SCAN" Crest
-/// Uses `assets/logo.png` if bundled, with a high-precision CustomPainter fallback.
 class ClassicalANLogoBadge extends StatelessWidget {
   final double size;
   const ClassicalANLogoBadge({super.key, this.size = 54});
@@ -130,27 +123,10 @@ class _ClassicalCrestPainter extends CustomPainter {
     final w = size.width;
     final h = size.height;
     final center = Offset(w / 2, h / 2);
+    canvas.drawRect(Rect.fromLTWH(0, 0, w, h), Paint()..color = kIvoryParchment);
+    canvas.drawCircle(center, w * 0.42, Paint()..color = const Color(0xFF3A322A)..style = PaintingStyle.stroke..strokeWidth = w * 0.025);
+    canvas.drawCircle(center, w * 0.38, Paint()..color = kBronzeAccent..style = PaintingStyle.stroke..strokeWidth = w * 0.012);
 
-    // Ivory Background
-    canvas.drawRect(
-      Rect.fromLTWH(0, 0, w, h),
-      Paint()..color = kIvoryParchment,
-    );
-
-    // Double Filigree Outer & Inner Rings
-    final ringPaint = Paint()
-      ..color = const Color(0xFF3A322A)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = w * 0.025;
-    canvas.drawCircle(center, w * 0.42, ringPaint);
-
-    final innerRingPaint = Paint()
-      ..color = kBronzeAccent
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = w * 0.012;
-    canvas.drawCircle(center, w * 0.38, innerRingPaint);
-
-    // Classical Serif "AN" + "SCAN" Text
     final tpAN = TextPainter(
       text: TextSpan(
         text: 'AN',
@@ -166,30 +142,6 @@ class _ClassicalCrestPainter extends CustomPainter {
       textDirection: ui.TextDirection.ltr,
     )..layout();
     tpAN.paint(canvas, Offset((w - tpAN.width) / 2, h * 0.18));
-
-    // Magnifying Lens Accent in Center
-    final lensCenter = Offset(w * 0.51, h * 0.47);
-    canvas.drawCircle(
-      lensCenter,
-      w * 0.08,
-      Paint()..color = kIvoryParchment,
-    );
-    canvas.drawCircle(
-      lensCenter,
-      w * 0.08,
-      Paint()
-        ..color = const Color(0xFF3A322A)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = w * 0.03,
-    );
-    canvas.drawLine(
-      Offset(lensCenter.dx + w * 0.05, lensCenter.dy + w * 0.05),
-      Offset(lensCenter.dx + w * 0.13, lensCenter.dy + w * 0.13),
-      Paint()
-        ..color = const Color(0xFF3A322A)
-        ..strokeWidth = w * 0.04
-        ..strokeCap = StrokeCap.round,
-    );
 
     final tpScan = TextPainter(
       text: TextSpan(
@@ -210,10 +162,6 @@ class _ClassicalCrestPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
-
-// =============================================================================
-// 2. DATA MODELS FOR VAULT, PAGES, OCR & ANNOTATIONS
-// =============================================================================
 
 class VaultFile {
   final String name;
@@ -252,15 +200,14 @@ extension ScanColorFilterLabel on ScanColorFilter {
 
 class OcrWordBox {
   final String text;
-  final Rect boundingBox; // In original image pixel coordinates
-
+  final Rect boundingBox;
   OcrWordBox({required this.text, required this.boundingBox});
 }
 
 class PageAnnotationItem {
-  final String type; // 'stamp', 'watermark', 'whiteout', 'signature'
+  final String type;
   final String text;
-  final Offset normalizedPos; // 0.0 - 1.0 relative to page
+  final Offset normalizedPos;
   final Color color;
   final Uint8List? signaturePng;
 
@@ -296,23 +243,7 @@ class EditableDocumentPage {
         annotations = annotations ?? [];
 }
 
-// =============================================================================
-// 3. UNIVERSAL 8-WAY FORMAT CONVERSION ENGINE
-// =============================================================================
-
-enum ConversionDirection {
-  pdfToImage,
-  imageToPdf,
-  pdfToWord,
-  wordToPdf,
-  pdfToExcel,
-  excelToPdf,
-  wordToExcel,
-  excelToWord,
-}
-
 class UniversalFormatConverterEngine {
-  /// Extracts text from a `.docx` OpenXML archive
   static Future<List<String>> extractLinesFromDocx(Uint8List docxBytes) async {
     try {
       final archive = ZipDecoder().decodeBytes(docxBytes);
@@ -332,12 +263,10 @@ class UniversalFormatConverterEngine {
         }
       }
     } catch (_) {}
-    // Fallback plain UTF8 decode
     final raw = utf8.decode(docxBytes, allowMalformed: true);
     return raw.split('\n').where((l) => l.trim().isNotEmpty).toList();
   }
 
-  /// Builds a genuine OpenXML `.docx` file from paragraphs or table rows
   static Uint8List buildDocxBytes({
     required String title,
     required List<String> paragraphs,
@@ -360,14 +289,10 @@ class UniversalFormatConverterEngine {
     final sb = StringBuffer();
     sb.write('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
     sb.write('<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>');
-
-    // Title Header
     sb.write('<w:p><w:r><w:rPr><w:b/><w:sz w:val="32"/></w:rPr><w:t>${esc.convert(title)}</w:t></w:r></w:p>');
-
     for (final line in paragraphs) {
       sb.write('<w:p><w:r><w:t>${esc.convert(line)}</w:t></w:r></w:p>');
     }
-
     if (tableData != null && tableData.isNotEmpty) {
       sb.write('<w:tbl>');
       for (final row in tableData) {
@@ -379,7 +304,6 @@ class UniversalFormatConverterEngine {
       }
       sb.write('</w:tbl>');
     }
-
     sb.write('</w:body></w:document>');
     final docStr = sb.toString();
 
@@ -390,15 +314,10 @@ class UniversalFormatConverterEngine {
     return Uint8List.fromList(ZipEncoder().encode(archive)!);
   }
 
-  /// Extracts rows from `.xlsx` or `.csv`
   static List<List<String>> extractRowsFromExcelOrCsv(Uint8List bytes, String ext) {
     if (ext.toUpperCase() == 'CSV') {
       final content = utf8.decode(bytes, allowMalformed: true);
-      return content
-          .split('\n')
-          .where((l) => l.trim().isNotEmpty)
-          .map((l) => l.split(',').map((c) => c.trim()).toList())
-          .toList();
+      return content.split('\n').where((l) => l.trim().isNotEmpty).map((l) => l.split(',').map((c) => c.trim()).toList()).toList();
     }
     try {
       final excel = xls.Excel.decodeBytes(bytes);
@@ -415,7 +334,6 @@ class UniversalFormatConverterEngine {
     }
   }
 
-  /// Builds `.xlsx` bytes from structured rows
   static Uint8List buildExcelBytes(List<List<String>> rows, {String sheetName = 'AN_Scan_Sheet'}) {
     final excel = xls.Excel.createExcel();
     final defaultSheet = excel.getDefaultSheet();
@@ -427,15 +345,11 @@ class UniversalFormatConverterEngine {
       final rowValues = rows[r].map((v) => xls.TextCellValue(v)).toList();
       sheet.appendRow(rowValues);
     }
-    final encoded = excel.encode();
-    return Uint8List.fromList(encoded ?? []);
+    return Uint8List.fromList(excel.encode() ?? []);
   }
 
-  /// Runs OCR over all pages of a PDF and returns structured lines + table columns
-  static Future<List<String>> extractOcrLinesFromPdf(Uint8List pdfBytes, {bool hindi = false}) async {
-    final recognizer = TextRecognizer(
-      script: hindi ? TextRecognitionScript.devanagari : TextRecognitionScript.latin,
-    );
+  static Future<List<String>> extractOcrLinesFromPdf(Uint8List pdfBytes) async {
+    final recognizer = TextRecognizer(script: TextRecognitionScript.latin);
     final List<String> allLines = [];
     final tmpDir = await getTemporaryDirectory();
     int pageNum = 1;
@@ -460,10 +374,6 @@ class UniversalFormatConverterEngine {
     return allLines;
   }
 }
-
-// =============================================================================
-// 4. EXECUTIVE MASTER SHELL (HOME STUDIO, VAULT, ACCOUNTS & INTENT HANDLER)
-// =============================================================================
 
 class ExecutiveMasterShell extends StatefulWidget {
   const ExecutiveMasterShell({super.key});
@@ -496,15 +406,12 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
   }
 
   void _setupNativeIntentInterceptor() {
-    // Listen for live files opened while app is in memory
     _intentChannel.setMethodCallHandler((call) async {
       if (call.method == 'onIncomingFile' && call.arguments is String) {
-        final incomingPath = call.arguments as String;
-        await _ingestAndOpenExternalIntentFile(incomingPath);
+        await _ingestAndOpenExternalIntentFile(call.arguments as String);
       }
     });
 
-    // Check if app was cold-launched via "Open With AN Scan" from Gmail / WhatsApp / Files
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
         final initialPath = await _intentChannel.invokeMethod<String>('getInitialFile');
@@ -527,10 +434,7 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Opened & Saved "$fileName" into Vault'),
-        backgroundColor: kNavyPrimary,
-      ),
+      SnackBar(content: Text('Opened & Saved "$fileName" into Vault'), backgroundColor: kNavyPrimary),
     );
 
     final ext = p.extension(destPath).replaceAll('.', '').toUpperCase();
@@ -547,8 +451,7 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
   Future<void> _initWorkspace() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _accounts = prefs.getStringList('user_accounts') ??
-          ['Adesh Narang (Admin)', 'Head Office Desk', 'Personal Vault'];
+      _accounts = prefs.getStringList('user_accounts') ?? ['Adesh Narang (Admin)', 'Head Office Desk', 'Personal Vault'];
       _currentAccount = prefs.getString('active_account') ?? _accounts.first;
       _masterPin = prefs.getString('master_pin');
       _defaultCompression = prefs.getInt('default_compression') ?? 80;
@@ -563,9 +466,7 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
     final base = await getApplicationDocumentsDirectory();
     final safeFolder = _currentAccount.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
     final dir = Directory(p.join(base.path, 'AN_Scan_Vault', safeFolder));
-    if (!await dir.exists()) {
-      await dir.create(recursive: true);
-    }
+    if (!await dir.exists()) await dir.create(recursive: true);
     return dir;
   }
 
@@ -594,9 +495,7 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
       }
     }
     loaded.sort((a, b) => b.modified.compareTo(a.modified));
-    if (mounted) {
-      setState(() => _vaultFiles = loaded);
-    }
+    if (mounted) setState(() => _vaultFiles = loaded);
   }
 
   Future<void> _importExternalFilePicker() async {
@@ -628,11 +527,7 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Imported ${result.files.length} file(s) into AN Scan Vault!'),
-            action: SnackBarAction(
-              label: 'OPEN',
-              textColor: kGoldAccent,
-              onPressed: () => _openVaultFile(lastImported!),
-            ),
+            action: SnackBarAction(label: 'OPEN', textColor: kGoldAccent, onPressed: () => _openVaultFile(lastImported!)),
           ),
         );
       }
@@ -653,7 +548,6 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
 
     if (rawPaths.isEmpty || !mounted) return;
 
-    // Step 1: If single image captured, open 4-Corner Perspective Crop Studio immediately
     final List<EditableDocumentPage> initialPages = [];
     for (int i = 0; i < rawPaths.length; i++) {
       final rawBytes = await File(rawPaths[i]).readAsBytes();
@@ -663,13 +557,10 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
         final cropped = await Navigator.push<Uint8List>(
           context,
           MaterialPageRoute(
-            builder: (_) => FourCornerPerspectiveCropScreen(
-              imageBytes: rawBytes,
-              pageTitle: '4-Corner Perspective Crop',
-            ),
+            builder: (_) => FourCornerPerspectiveCropScreen(imageBytes: rawBytes, pageTitle: '4-Corner Perspective Crop'),
           ),
         );
-        if (cropped == null) return; // User cancelled scan
+        if (cropped == null) return;
         processedBytes = cropped;
       }
 
@@ -695,11 +586,8 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
           preferHindiOcr: _preferHindiOcr,
           onSaveDocument: (pdfBytes, finalFileName) async {
             final dir = await _getAccountVaultDir();
-            final cleanName = finalFileName.toLowerCase().endsWith('.pdf')
-                ? finalFileName
-                : '$finalFileName.pdf';
-            final outFile = File(p.join(dir.path, cleanName));
-            await outFile.writeAsBytes(pdfBytes);
+            final cleanName = finalFileName.toLowerCase().endsWith('.pdf') ? finalFileName : '$finalFileName.pdf';
+            await File(p.join(dir.path, cleanName)).writeAsBytes(pdfBytes);
             await _reloadVault();
           },
         ),
@@ -716,7 +604,6 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
     if (!mounted) return;
 
     if (file.ext == 'PDF') {
-      // Show loading dialog while rasterizing PDF pages into the Full Acrobat Studio
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -745,7 +632,7 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
             ),
           );
         }
-        if (mounted) Navigator.pop(context); // Dismiss loader
+        if (mounted) Navigator.pop(context);
 
         if (pages.isEmpty) {
           await OpenFilex.open(file.path);
@@ -804,7 +691,6 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
         ),
       );
     } else {
-      // Open Word/Excel/CSV in in-app preview or external handler
       await _showOfficeFilePreviewSheet(file);
     }
   }
@@ -833,13 +719,7 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
           children: [
             Row(
               children: [
-                Expanded(
-                  child: Text(
-                    file.name,
-                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
-                    maxLines: 1,
-                  ),
-                ),
+                Expanded(child: Text(file.name, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900), maxLines: 1)),
                 FilledButton.tonalIcon(
                   onPressed: () {
                     Navigator.pop(ctx);
@@ -884,26 +764,17 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
           obscureText: true,
           keyboardType: TextInputType.number,
           maxLength: 4,
-          decoration: const InputDecoration(
-            labelText: 'Enter 4-Digit PIN',
-            border: OutlineInputBorder(),
-          ),
+          decoration: const InputDecoration(labelText: 'Enter 4-Digit PIN', border: OutlineInputBorder()),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, ctrl.text.trim() == _masterPin),
-            child: const Text('Verify'),
-          ),
+          FilledButton(onPressed: () => Navigator.pop(ctx, ctrl.text.trim() == _masterPin), child: const Text('Verify')),
         ],
       ),
     );
     return res ?? false;
   }
 
-  // ===========================================================================
-  // UNIVERSAL 8-WAY FORMAT CONVERTER HUB SHEET
-  // ===========================================================================
   void _openUniversalConverterHub() {
     showModalBottomSheet(
       context: context,
@@ -923,10 +794,7 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
               child: Container(
                 width: 44,
                 height: 5,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(4),
-                ),
+                decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(4)),
               ),
             ),
             const SizedBox(height: 14),
@@ -936,21 +804,12 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
                 const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Universal Format Converter Hub',
-                      style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: kNavyPrimary),
-                    ),
+                    Text('Universal Format Converter Hub', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: kNavyPrimary)),
                     SizedBox(height: 2),
-                    Text(
-                      'Convert any document across PDF, Word, Excel & Images',
-                      style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
-                    ),
+                    Text('Convert any document across PDF, Word, Excel & Images', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B))),
                   ],
                 ),
-                IconButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  icon: const Icon(Icons.close),
-                ),
+                IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close)),
               ],
             ),
             const Divider(height: 24),
@@ -961,70 +820,14 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
                 crossAxisSpacing: 12,
                 childAspectRatio: 1.38,
                 children: [
-                  _buildConverterCard(
-                    ctx,
-                    title: 'PDF → Image',
-                    sub: 'Export PDF pages to HD JPG/PNG',
-                    icon: Icons.collections_bookmark_outlined,
-                    badgeColor: const Color(0xFFDC2626),
-                    direction: ConversionDirection.pdfToImage,
-                  ),
-                  _buildConverterCard(
-                    ctx,
-                    title: 'Image → PDF',
-                    sub: 'Compile JPG/PNG photos into PDF',
-                    icon: Icons.picture_as_pdf_outlined,
-                    badgeColor: const Color(0xFFEA580C),
-                    direction: ConversionDirection.imageToPdf,
-                  ),
-                  _buildConverterCard(
-                    ctx,
-                    title: 'PDF → Word',
-                    sub: 'Convert PDF into editable .DOCX',
-                    icon: Icons.description_outlined,
-                    badgeColor: const Color(0xFF1D4ED8),
-                    direction: ConversionDirection.pdfToWord,
-                  ),
-                  _buildConverterCard(
-                    ctx,
-                    title: 'Word → PDF',
-                    sub: 'Convert .DOCX into printable PDF',
-                    icon: Icons.article_outlined,
-                    badgeColor: const Color(0xFF2563EB),
-                    direction: ConversionDirection.wordToPdf,
-                  ),
-                  _buildConverterCard(
-                    ctx,
-                    title: 'PDF → Excel',
-                    sub: 'Extract PDF tables into .XLSX',
-                    icon: Icons.grid_on_rounded,
-                    badgeColor: const Color(0xFF15803D),
-                    direction: ConversionDirection.pdfToExcel,
-                  ),
-                  _buildConverterCard(
-                    ctx,
-                    title: 'Excel → PDF',
-                    sub: 'Turn .XLSX/.CSV sheets into PDF',
-                    icon: Icons.table_chart_outlined,
-                    badgeColor: const Color(0xFF0D9488),
-                    direction: ConversionDirection.excelToPdf,
-                  ),
-                  _buildConverterCard(
-                    ctx,
-                    title: 'Word → Excel',
-                    sub: 'Convert .DOCX lines/tables to .XLSX',
-                    icon: Icons.swap_horiz_rounded,
-                    badgeColor: const Color(0xFF7C3AED),
-                    direction: ConversionDirection.wordToExcel,
-                  ),
-                  _buildConverterCard(
-                    ctx,
-                    title: 'Excel → Word',
-                    sub: 'Format .XLSX data into .DOCX table',
-                    icon: Icons.transform_rounded,
-                    badgeColor: const Color(0xFF9333EA),
-                    direction: ConversionDirection.excelToWord,
-                  ),
+                  _buildConverterCard(ctx, title: 'PDF → Image', sub: 'Export PDF pages to HD JPG/PNG', icon: Icons.collections_bookmark_outlined, badgeColor: const Color(0xFFDC2626), direction: ConversionDirection.pdfToImage),
+                  _buildConverterCard(ctx, title: 'Image → PDF', sub: 'Compile JPG/PNG photos into PDF', icon: Icons.picture_as_pdf_outlined, badgeColor: const Color(0xFFEA580C), direction: ConversionDirection.imageToPdf),
+                  _buildConverterCard(ctx, title: 'PDF → Word', sub: 'Convert PDF into editable .DOCX', icon: Icons.description_outlined, badgeColor: const Color(0xFF1D4ED8), direction: ConversionDirection.pdfToWord),
+                  _buildConverterCard(ctx, title: 'Word → PDF', sub: 'Convert .DOCX into printable PDF', icon: Icons.article_outlined, badgeColor: const Color(0xFF2563EB), direction: ConversionDirection.wordToPdf),
+                  _buildConverterCard(ctx, title: 'PDF → Excel', sub: 'Extract PDF tables into .XLSX', icon: Icons.grid_on_rounded, badgeColor: const Color(0xFF15803D), direction: ConversionDirection.pdfToExcel),
+                  _buildConverterCard(ctx, title: 'Excel → PDF', sub: 'Turn .XLSX/.CSV sheets into PDF', icon: Icons.table_chart_outlined, badgeColor: const Color(0xFF0D9488), direction: ConversionDirection.excelToPdf),
+                  _buildConverterCard(ctx, title: 'Word → Excel', sub: 'Convert .DOCX lines/tables to .XLSX', icon: Icons.swap_horiz_rounded, badgeColor: const Color(0xFF7C3AED), direction: ConversionDirection.wordToExcel),
+                  _buildConverterCard(ctx, title: 'Excel → Word', sub: 'Format .XLSX data into .DOCX table', icon: Icons.transform_rounded, badgeColor: const Color(0xFF9333EA), direction: ConversionDirection.excelToWord),
                 ],
               ),
             ),
@@ -1034,14 +837,7 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
     );
   }
 
-  Widget _buildConverterCard(
-    BuildContext sheetContext, {
-    required String title,
-    required String sub,
-    required IconData icon,
-    required Color badgeColor,
-    required ConversionDirection direction,
-  }) {
+  Widget _buildConverterCard(BuildContext sheetContext, {required String title, required String sub, required IconData icon, required Color badgeColor, required ConversionDirection direction}) {
     return InkWell(
       onTap: () {
         Navigator.pop(sheetContext);
@@ -1061,25 +857,13 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
           children: [
             Container(
               padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: badgeColor.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(10),
-              ),
+              decoration: BoxDecoration(color: badgeColor.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
               child: Icon(icon, color: badgeColor, size: 22),
             ),
             const SizedBox(height: 10),
-            Text(
-              title,
-              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: kNavyPrimary),
-              maxLines: 1,
-            ),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: kNavyPrimary), maxLines: 1),
             const SizedBox(height: 3),
-            Text(
-              sub,
-              style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
+            Text(sub, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)), maxLines: 2, overflow: TextOverflow.ellipsis),
           ],
         ),
       ),
@@ -1099,10 +883,7 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
       allowedExts = ['xlsx', 'csv'];
     }
 
-    final picked = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: allowedExts,
-    );
+    final picked = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: allowedExts);
     if (picked == null || picked.files.single.path == null) return;
 
     final srcPath = picked.files.single.path!;
@@ -1138,20 +919,12 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
           }
           outputMessage = 'Extracted ${pNum - 1} page image(s) to Vault!';
           break;
-
         case ConversionDirection.pdfToWord:
-          final lines = await UniversalFormatConverterEngine.extractOcrLinesFromPdf(
-            rawBytes,
-            hindi: _preferHindiOcr,
-          );
-          final docx = UniversalFormatConverterEngine.buildDocxBytes(
-            title: baseName,
-            paragraphs: lines,
-          );
+          final lines = await UniversalFormatConverterEngine.extractOcrLinesFromPdf(rawBytes);
+          final docx = UniversalFormatConverterEngine.buildDocxBytes(title: baseName, paragraphs: lines);
           await File(p.join(vaultDir.path, '${baseName}_Converted.docx')).writeAsBytes(docx);
           outputMessage = 'Converted PDF to editable Word (.docx)!';
           break;
-
         case ConversionDirection.wordToPdf:
           final lines = await UniversalFormatConverterEngine.extractLinesFromDocx(rawBytes);
           final pdf = pw.Document();
@@ -1160,36 +933,21 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
               pageFormat: PdfPageFormat.a4,
               margin: const pw.EdgeInsets.all(32),
               build: (_) => [
-                pw.Header(
-                  level: 0,
-                  child: pw.Text(baseName, style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-                ),
-                ...lines.map(
-                  (l) => pw.Padding(
-                    padding: const pw.EdgeInsets.only(bottom: 6),
-                    child: pw.Text(l, style: const pw.TextStyle(fontSize: 11)),
-                  ),
-                ),
+                pw.Header(level: 0, child: pw.Text(baseName, style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold))),
+                ...lines.map((l) => pw.Padding(padding: const pw.EdgeInsets.only(bottom: 6), child: pw.Text(l, style: const pw.TextStyle(fontSize: 11)))),
               ],
             ),
           );
           await File(p.join(vaultDir.path, '${baseName}_WordToPdf.pdf')).writeAsBytes(await pdf.save());
           outputMessage = 'Converted Word document to PDF!';
           break;
-
         case ConversionDirection.pdfToExcel:
-          final lines = await UniversalFormatConverterEngine.extractOcrLinesFromPdf(
-            rawBytes,
-            hindi: _preferHindiOcr,
-          );
-          final List<List<String>> rows = lines
-              .map((l) => l.split(RegExp(r'\s{2,}|\t')).map((e) => e.trim()).toList())
-              .toList();
+          final lines = await UniversalFormatConverterEngine.extractOcrLinesFromPdf(rawBytes);
+          final List<List<String>> rows = lines.map((l) => l.split(RegExp(r'\s{2,}|\t')).map((e) => e.trim()).toList()).toList();
           final xlsxBytes = UniversalFormatConverterEngine.buildExcelBytes(rows, sheetName: 'PDF_Extract');
           await File(p.join(vaultDir.path, '${baseName}_Table.xlsx')).writeAsBytes(xlsxBytes);
           outputMessage = 'Converted PDF to Excel (.xlsx)!';
           break;
-
         case ConversionDirection.excelToPdf:
           final rows = UniversalFormatConverterEngine.extractRowsFromExcelOrCsv(rawBytes, ext);
           final pdf = pw.Document();
@@ -1198,73 +956,48 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
               pageFormat: PdfPageFormat.a4,
               margin: const pw.EdgeInsets.all(24),
               build: (_) => [
-                pw.Header(
-                  level: 0,
-                  child: pw.Text('Spreadsheet Report: $baseName', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                ),
-                pw.TableHelper.fromTextArray(
-                  data: rows.take(250).toList(),
-                  cellStyle: const pw.TextStyle(fontSize: 9),
-                  headerStyle: pw.TextStyle(fontSize: 9.5, fontWeight: pw.FontWeight.bold),
-                ),
+                pw.Header(level: 0, child: pw.Text('Spreadsheet Report: $baseName', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                pw.TableHelper.fromTextArray(data: rows.take(250).toList(), cellStyle: const pw.TextStyle(fontSize: 9), headerStyle: pw.TextStyle(fontSize: 9.5, fontWeight: pw.FontWeight.bold)),
               ],
             ),
           );
           await File(p.join(vaultDir.path, '${baseName}_Sheet.pdf')).writeAsBytes(await pdf.save());
           outputMessage = 'Converted Excel spreadsheet to PDF!';
           break;
-
         case ConversionDirection.wordToExcel:
           final lines = await UniversalFormatConverterEngine.extractLinesFromDocx(rawBytes);
-          final rows = lines
-              .map((l) => l.split(RegExp(r'\s{2,}|\t|,')).map((c) => c.trim()).toList())
-              .toList();
+          final rows = lines.map((l) => l.split(RegExp(r'\s{2,}|\t|,')).map((c) => c.trim()).toList()).toList();
           final xlsxBytes = UniversalFormatConverterEngine.buildExcelBytes(rows, sheetName: 'From_Word');
           await File(p.join(vaultDir.path, '${baseName}_FromWord.xlsx')).writeAsBytes(xlsxBytes);
           outputMessage = 'Converted Word document to Excel (.xlsx)!';
           break;
-
         case ConversionDirection.excelToWord:
           final rows = UniversalFormatConverterEngine.extractRowsFromExcelOrCsv(rawBytes, ext);
-          final docxBytes = UniversalFormatConverterEngine.buildDocxBytes(
-            title: 'Spreadsheet Export: $baseName',
-            paragraphs: ['Generated by AN Scan Universal Converter'],
-            tableData: rows,
-          );
+          final docxBytes = UniversalFormatConverterEngine.buildDocxBytes(title: 'Spreadsheet Export: $baseName', paragraphs: ['Generated by AN Scan Universal Converter'], tableData: rows);
           await File(p.join(vaultDir.path, '${baseName}_FromExcel.docx')).writeAsBytes(docxBytes);
           outputMessage = 'Converted Excel spreadsheet to Word (.docx)!';
           break;
-
         case ConversionDirection.imageToPdf:
           break;
       }
 
       await _reloadVault();
       if (mounted) {
-        Navigator.pop(context); // Dismiss loading
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(outputMessage), backgroundColor: const Color(0xFF15803D)),
-        );
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(outputMessage), backgroundColor: const Color(0xFF15803D)));
       }
     } catch (e) {
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Conversion error: $e'), backgroundColor: Colors.red),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Conversion error: $e'), backgroundColor: Colors.red));
       }
     }
   }
 
-  // ===========================================================================
-  // PDF MERGER DIALOG
-  // ===========================================================================
   Future<void> _openPdfMergerDialog() async {
     final pdfs = _vaultFiles.where((f) => f.ext == 'PDF').toList();
     if (pdfs.length < 2) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Import or scan at least 2 PDF files in Vault to merge.')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Import or scan at least 2 PDF files in Vault to merge.')));
       return;
     }
 
@@ -1281,13 +1014,7 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Output Merged PDF Name',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
+                TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Output Merged PDF Name', border: OutlineInputBorder())),
                 const SizedBox(height: 12),
                 Flexible(
                   child: ListView.builder(
@@ -1337,15 +1064,11 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
                         }
                       }
                       final dir = await _getAccountVaultDir();
-                      final clean = nameCtrl.text.trim().endsWith('.pdf')
-                          ? nameCtrl.text.trim()
-                          : '${nameCtrl.text.trim()}.pdf';
+                      final clean = nameCtrl.text.trim().endsWith('.pdf') ? nameCtrl.text.trim() : '${nameCtrl.text.trim()}.pdf';
                       await File(p.join(dir.path, clean)).writeAsBytes(await mergedDoc.save());
                       await _reloadVault();
                       if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Merged ${selectedPaths.length} PDFs into $clean!')),
-                        );
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Merged ${selectedPaths.length} PDFs into $clean!')));
                       }
                     },
               icon: const Icon(Icons.call_merge),
@@ -1363,9 +1086,6 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
     return '${(bytes / (1024 * 1024)).toStringAsFixed(2)} MB';
   }
 
-  // ===========================================================================
-  // MAIN SHELL BUILD (WITH NON-OVERLAPPING BOTTOM BAR)
-  // ===========================================================================
   @override
   Widget build(BuildContext context) {
     if (!_isVaultUnlocked) {
@@ -1383,15 +1103,9 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
                   children: [
                     const ClassicalANLogoBadge(size: 76),
                     const SizedBox(height: 16),
-                    const Text(
-                      'AN SCAN VAULT LOCKED',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 1.2),
-                    ),
+                    const Text('AN SCAN VAULT LOCKED', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
                     const SizedBox(height: 6),
-                    Text(
-                      _currentAccount,
-                      style: const TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
-                    ),
+                    Text(_currentAccount, style: const TextStyle(fontSize: 12.5, color: Color(0xFF64748B))),
                     const SizedBox(height: 18),
                     TextField(
                       controller: pinCtrl,
@@ -1400,10 +1114,7 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
                       maxLength: 4,
                       textAlign: TextAlign.center,
                       style: const TextStyle(fontSize: 22, letterSpacing: 8, fontWeight: FontWeight.bold),
-                      decoration: const InputDecoration(
-                        labelText: '4-Digit Master PIN',
-                        border: OutlineInputBorder(),
-                      ),
+                      decoration: const InputDecoration(labelText: '4-Digit Master PIN', border: OutlineInputBorder()),
                     ),
                     const SizedBox(height: 12),
                     SizedBox(
@@ -1413,9 +1124,7 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
                           if (pinCtrl.text.trim() == _masterPin) {
                             setState(() => _isVaultUnlocked = true);
                           } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Incorrect Master PIN')),
-                            );
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Incorrect Master PIN')));
                           }
                         },
                         icon: const Icon(Icons.lock_open),
@@ -1442,43 +1151,17 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'A N   S C A N',
-                    style: TextStyle(
-                      fontFamily: 'serif',
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 2.2,
-                      fontSize: 18,
-                      color: Colors.white,
-                    ),
-                  ),
-                  Text(
-                    '$_currentAccount • adeshnarang.in',
-                    style: const TextStyle(fontSize: 11, color: kGoldAccent, fontWeight: FontWeight.w500),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  const Text('A N   S C A N', style: TextStyle(fontFamily: 'serif', fontWeight: FontWeight.w900, letterSpacing: 2.2, fontSize: 18, color: Colors.white)),
+                  Text('$_currentAccount • adeshnarang.in', style: const TextStyle(fontSize: 11, color: kGoldAccent, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
                 ],
               ),
             ),
           ],
         ),
         actions: [
-          IconButton(
-            tooltip: 'Quick Camera Scan',
-            icon: const Icon(Icons.camera_alt_outlined, color: kGoldAccent),
-            onPressed: () => _startScannerWorkflow(fromGallery: false),
-          ),
-          IconButton(
-            tooltip: 'Import External PDF / Office File',
-            icon: const Icon(Icons.file_upload_outlined),
-            onPressed: _importExternalFilePicker,
-          ),
-          IconButton(
-            tooltip: 'Refresh Vault',
-            icon: const Icon(Icons.sync),
-            onPressed: _reloadVault,
-          ),
+          IconButton(tooltip: 'Quick Camera Scan', icon: const Icon(Icons.camera_alt_outlined, color: kGoldAccent), onPressed: () => _startScannerWorkflow(fromGallery: false)),
+          IconButton(tooltip: 'Import External PDF / Office File', icon: const Icon(Icons.file_upload_outlined), onPressed: _importExternalFilePicker),
+          IconButton(tooltip: 'Refresh Vault', icon: const Icon(Icons.sync), onPressed: _reloadVault),
         ],
       ),
       body: IndexedStack(
@@ -1493,43 +1176,22 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
         selectedIndex: _tabIndex,
         onDestinationSelected: (i) => setState(() => _tabIndex = i),
         destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.dashboard_customize_outlined),
-            selectedIcon: Icon(Icons.dashboard_customize),
-            label: 'Studio',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.folder_special_outlined),
-            selectedIcon: Icon(Icons.folder_special),
-            label: 'File Vault',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.verified_user_outlined),
-            selectedIcon: Icon(Icons.verified_user),
-            label: 'Accounts',
-          ),
+          NavigationDestination(icon: Icon(Icons.dashboard_customize_outlined), selectedIcon: Icon(Icons.dashboard_customize), label: 'Studio'),
+          NavigationDestination(icon: Icon(Icons.folder_special_outlined), selectedIcon: Icon(Icons.folder_special), label: 'File Vault'),
+          NavigationDestination(icon: Icon(Icons.verified_user_outlined), selectedIcon: Icon(Icons.verified_user), label: 'Accounts'),
         ],
       ),
     );
   }
 
-  // ===========================================================================
-  // TAB 1: CLEAN EXECUTIVE STUDIO DASHBOARD (ZERO OVERLAP)
-  // ===========================================================================
   Widget _buildExecutiveStudioDashboard() {
     return ListView(
-      // Extra bottom padding guarantees nothing is ever hidden or blocked while scrolling
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 36),
       children: [
-        // Hero Executive Banner with Docked Quick Scan Action (Replaces overlapping FAB!)
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [kNavyPrimary, kNavySecondary],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            gradient: const LinearGradient(colors: [kNavyPrimary, kNavySecondary], begin: Alignment.topLeft, end: Alignment.bottomRight),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: kGoldAccent.withOpacity(0.45), width: 1.2),
           ),
@@ -1543,20 +1205,9 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'AN Scan Document Studio',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 16.5,
-                            letterSpacing: 0.4,
-                          ),
-                        ),
+                        const Text('AN Scan Document Studio', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16.5, letterSpacing: 0.4)),
                         const SizedBox(height: 4),
-                        Text(
-                          '${_vaultFiles.length} Vault Docs • Selectable OCR & 8-Way Converter',
-                          style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 12),
-                        ),
+                        Text('${_vaultFiles.length} Vault Docs • Selectable OCR & 8-Way Converter', style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 12)),
                       ],
                     ),
                   ),
@@ -1575,10 +1226,7 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
                       ),
                       onPressed: () => _startScannerWorkflow(fromGallery: false),
                       icon: const Icon(Icons.camera_enhance_rounded, size: 20),
-                      label: const Text(
-                        'Capture & Perspective Scan',
-                        style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
-                      ),
+                      label: const Text('Capture & Perspective Scan', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13)),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -1599,15 +1247,7 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
           ),
         ),
         const SizedBox(height: 20),
-        const Text(
-          'CORE SCANNER, ACROBAT & CONVERTER SUITE',
-          style: TextStyle(
-            fontSize: 11.5,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 0.8,
-            color: Color(0xFF475569),
-          ),
-        ),
+        const Text('CORE SCANNER, ACROBAT & CONVERTER SUITE', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900, letterSpacing: 0.8, color: Color(0xFF475569))),
         const SizedBox(height: 10),
         GridView.count(
           crossAxisCount: 2,
@@ -1617,33 +1257,11 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
           crossAxisSpacing: 12,
           childAspectRatio: 1.42,
           children: [
-            _buildStudioToolTile(
-              icon: Icons.Autorenew_rounded,
-              fallbackIcon: Icons.hub_outlined,
-              title: 'Format Converter Hub',
-              sub: 'All 8 Formats: PDF ⇄ Word ⇄ Excel ⇄ Img',
-              accent: const Color(0xFFB45309),
-              onTap: _openUniversalConverterHub,
-            ),
-            _buildStudioToolTile(
-              icon: Icons.crop_free_rounded,
-              fallbackIcon: Icons.crop_free_rounded,
-              title: '4-Corner Camera Scan',
-              sub: 'Perspective Warp & Auto Filters',
-              accent: kNavyPrimary,
-              onTap: () => _startScannerWorkflow(fromGallery: false),
-            ),
-            _buildStudioToolTile(
-              icon: Icons.collections_outlined,
-              fallbackIcon: Icons.collections_outlined,
-              title: 'Gallery Batch to PDF',
-              sub: 'Multi-Photo Import & Compress',
-              accent: const Color(0xFF1D4ED8),
-              onTap: () => _startScannerWorkflow(fromGallery: true),
-            ),
+            _buildStudioToolTile(icon: Icons.hub_outlined, title: 'Format Converter Hub', sub: 'All 8 Formats: PDF ⇄ Word ⇄ Excel ⇄ Img', accent: const Color(0xFFB45309), onTap: _openUniversalConverterHub),
+            _buildStudioToolTile(icon: Icons.crop_free_rounded, title: '4-Corner Camera Scan', sub: 'Perspective Warp & Auto Filters', accent: kNavyPrimary, onTap: () => _startScannerWorkflow(fromGallery: false)),
+            _buildStudioToolTile(icon: Icons.collections_outlined, title: 'Gallery Batch to PDF', sub: 'Multi-Photo Import & Compress', accent: const Color(0xFF1D4ED8), onTap: () => _startScannerWorkflow(fromGallery: true)),
             _buildStudioToolTile(
               icon: Icons.document_scanner_outlined,
-              fallbackIcon: Icons.document_scanner_outlined,
               title: 'In-Place Visual OCR',
               sub: 'Select Text Directly on Picture',
               accent: const Color(0xFF15803D),
@@ -1659,49 +1277,22 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
                         imageBytes: bytes,
                         imageWidth: decoded?.width ?? 1000,
                         imageHeight: decoded?.height ?? 1400,
-                        initialHindi: _preferHindiOcr,
                       ),
                     ),
                   );
                 }
               },
             ),
-            _buildStudioToolTile(
-              icon: Icons.edit_document,
-              fallbackIcon: Icons.edit_document,
-              title: 'Edit / Sign / Stamp PDF',
-              sub: 'Open External PDF in Studio',
-              accent: const Color(0xFFDC2626),
-              onTap: _importExternalFilePicker,
-            ),
-            _buildStudioToolTile(
-              icon: Icons.call_merge_rounded,
-              fallbackIcon: Icons.call_merge_rounded,
-              title: 'Merge Multiple PDFs',
-              sub: 'Combine Vault PDFs into One',
-              accent: const Color(0xFF7C3AED),
-              onTap: _openPdfMergerDialog,
-            ),
+            _buildStudioToolTile(icon: Icons.edit_document, title: 'Edit / Sign / Stamp PDF', sub: 'Open External PDF in Studio', accent: const Color(0xFFDC2626), onTap: _importExternalFilePicker),
+            _buildStudioToolTile(icon: Icons.call_merge_rounded, title: 'Merge Multiple PDFs', sub: 'Combine Vault PDFs into One', accent: const Color(0xFF7C3AED), onTap: _openPdfMergerDialog),
           ],
         ),
         const SizedBox(height: 22),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              'RECENT WORKSPACE DOCUMENTS',
-              style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.8,
-                color: Color(0xFF475569),
-              ),
-            ),
-            TextButton.icon(
-              onPressed: () => setState(() => _tabIndex = 1),
-              icon: const Icon(Icons.arrow_forward, size: 16),
-              label: const Text('Open Vault'),
-            ),
+            const Text('RECENT WORKSPACE DOCUMENTS', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900, letterSpacing: 0.8, color: Color(0xFF475569))),
+            TextButton.icon(onPressed: () => setState(() => _tabIndex = 1), icon: const Icon(Icons.arrow_forward, size: 16), label: const Text('Open Vault')),
           ],
         ),
         if (_vaultFiles.isEmpty)
@@ -1712,16 +1303,9 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
                 children: [
                   const Icon(Icons.folder_copy_outlined, size: 42, color: Color(0xFF94A3B8)),
                   const SizedBox(height: 10),
-                  const Text(
-                    'Your AN Scan Vault is Ready',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                  ),
+                  const Text('Your AN Scan Vault is Ready', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                   const SizedBox(height: 4),
-                  const Text(
-                    'Scan a document, open a PDF from Gmail, or use the Format Converter Hub.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                  ),
+                  const Text('Scan a document, open a PDF from Gmail, or use the Format Converter Hub.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                 ],
               ),
             ),
@@ -1732,14 +1316,7 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
     );
   }
 
-  Widget _buildStudioToolTile({
-    required IconData icon,
-    required IconData fallbackIcon,
-    required String title,
-    required String sub,
-    required Color accent,
-    required VoidCallback onTap,
-  }) {
+  Widget _buildStudioToolTile({required IconData icon, required String title, required String sub, required Color accent, required VoidCallback onTap}) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -1753,26 +1330,13 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: accent.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(fallbackIcon, color: accent, size: 24),
+                decoration: BoxDecoration(color: accent.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+                child: Icon(icon, color: accent, size: 24),
               ),
               const SizedBox(height: 10),
-              Text(
-                title,
-                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5, color: kNavyPrimary),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5, color: kNavyPrimary), maxLines: 1, overflow: TextOverflow.ellipsis),
               const SizedBox(height: 2),
-              Text(
-                sub,
-                style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
+              Text(sub, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)), maxLines: 1, overflow: TextOverflow.ellipsis),
             ],
           ),
         ),
@@ -1780,9 +1344,6 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
     );
   }
 
-  // ===========================================================================
-  // TAB 2: FILE VAULT DIRECTORY
-  // ===========================================================================
   Widget _buildVaultDirectoryTab() {
     final filtered = _vaultFiles.where((f) {
       final matchesSearch = f.name.toLowerCase().contains(_searchQuery.toLowerCase());
@@ -1806,10 +1367,7 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
               filled: true,
               fillColor: Colors.white,
               contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-              ),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
             ),
           ),
         ),
@@ -1821,11 +1379,7 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
               final active = _selectedCategory == cat;
               return Padding(
                 padding: const EdgeInsets.only(right: 8),
-                child: ChoiceChip(
-                  label: Text(cat),
-                  selected: active,
-                  onSelected: (_) => setState(() => _selectedCategory = cat),
-                ),
+                child: ChoiceChip(label: Text(cat), selected: active, onSelected: (_) => setState(() => _selectedCategory = cat)),
               );
             }).toList(),
           ),
@@ -1857,36 +1411,16 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
           width: 44,
           height: 44,
           alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: badge.withOpacity(0.12),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(
-            file.ext,
-            style: TextStyle(color: badge, fontWeight: FontWeight.w900, fontSize: 10.5),
-          ),
+          decoration: BoxDecoration(color: badge.withOpacity(0.12), borderRadius: BorderRadius.circular(12)),
+          child: Text(file.ext, style: TextStyle(color: badge, fontWeight: FontWeight.w900, fontSize: 10.5)),
         ),
         title: Row(
           children: [
-            if (file.isLocked)
-              const Padding(
-                padding: EdgeInsets.only(right: 6),
-                child: Icon(Icons.lock, size: 15, color: kGoldAccent),
-              ),
-            Expanded(
-              child: Text(
-                file.name,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
+            if (file.isLocked) const Padding(padding: EdgeInsets.only(right: 6), child: Icon(Icons.lock, size: 15, color: kGoldAccent)),
+            Expanded(child: Text(file.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis)),
           ],
         ),
-        subtitle: Text(
-          '${_formatBytes(file.sizeBytes)} • ${DateFormat('dd MMM yyyy, hh:mm a').format(file.modified)}',
-          style: const TextStyle(fontSize: 11.5),
-        ),
+        subtitle: Text('${_formatBytes(file.sizeBytes)} • ${DateFormat('dd MMM yyyy, hh:mm a').format(file.modified)}', style: const TextStyle(fontSize: 11.5)),
         trailing: PopupMenuButton<String>(
           onSelected: (action) async {
             if (action == 'open') {
@@ -1931,23 +1465,14 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
             const PopupMenuItem(value: 'open', child: Text('Open in Studio')),
             const PopupMenuItem(value: 'share', child: Text('Share / Export')),
             const PopupMenuItem(value: 'rename', child: Text('Rename')),
-            PopupMenuItem(
-              value: 'lock',
-              child: Text(file.isLocked ? 'Remove PIN Lock' : 'Protect with PIN'),
-            ),
-            const PopupMenuItem(
-              value: 'delete',
-              child: Text('Delete Document', style: TextStyle(color: Colors.red)),
-            ),
+            PopupMenuItem(value: 'lock', child: Text(file.isLocked ? 'Remove PIN Lock' : 'Protect with PIN')),
+            const PopupMenuItem(value: 'delete', child: Text('Delete Document', style: TextStyle(color: Colors.red))),
           ],
         ),
       ),
     );
   }
 
-  // ===========================================================================
-  // TAB 3: ACCOUNTS, OCR SCRIPT & SECURITY SETTINGS
-  // ===========================================================================
   Widget _buildAccountsAndSecurityTab() {
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -2009,10 +1534,7 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
                         controller: ctrl,
                         maxLength: 4,
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          hintText: 'Leave empty to disable PIN',
-                          border: OutlineInputBorder(),
-                        ),
+                        decoration: const InputDecoration(hintText: 'Leave empty to disable PIN', border: OutlineInputBorder()),
                       ),
                       actions: [
                         TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
@@ -2045,33 +1567,22 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
   }
 }
 
-// =============================================================================
-// 5. INTERACTIVE 4-CORNER PERSPECTIVE CROPPING & HOMOGRAPHY WARP STUDIO
-// =============================================================================
-
 class FourCornerPerspectiveCropScreen extends StatefulWidget {
   final Uint8List imageBytes;
   final String pageTitle;
-
-  const FourCornerPerspectiveCropScreen({
-    super.key,
-    required this.imageBytes,
-    required this.pageTitle,
-  });
+  const FourCornerPerspectiveCropScreen({super.key, required this.imageBytes, required this.pageTitle});
 
   @override
   State<FourCornerPerspectiveCropScreen> createState() => _FourCornerPerspectiveCropScreenState();
 }
 
 class _FourCornerPerspectiveCropScreenState extends State<FourCornerPerspectiveCropScreen> {
-  // Normalized coordinates (0.0 to 1.0) for Top-Left, Top-Right, Bottom-Right, Bottom-Left
   List<Offset> _corners = [
     const Offset(0.08, 0.08),
     const Offset(0.92, 0.08),
     const Offset(0.92, 0.92),
     const Offset(0.08, 0.92),
   ];
-
   int? _activeDragIndex;
   Offset? _activeTouchNormalized;
   bool _processingWarp = false;
@@ -2086,53 +1597,35 @@ class _FourCornerPerspectiveCropScreenState extends State<FourCornerPerspectiveC
   Future<void> _loadUiImage() async {
     final codec = await ui.instantiateImageCodec(widget.imageBytes);
     final frame = await codec.getNextFrame();
-    if (mounted) {
-      setState(() => _decodedUiImage = frame.image);
-    }
+    if (mounted) setState(() => _decodedUiImage = frame.image);
   }
 
-  /// Performs true Bilinear Perspective Homography Warping using the 4 corner pins
   Future<Uint8List> _performPerspectiveWarp() async {
     final srcImg = img.decodeImage(widget.imageBytes);
     if (srcImg == null) return widget.imageBytes;
 
     final w = srcImg.width.toDouble();
     final h = srcImg.height.toDouble();
+    final p0 = Offset(_corners[0].dx * w, _corners[0].dy * h);
+    final p1 = Offset(_corners[1].dx * w, _corners[1].dy * h);
+    final p2 = Offset(_corners[2].dx * w, _corners[2].dy * h);
+    final p3 = Offset(_corners[3].dx * w, _corners[3].dy * h);
 
-    final p0 = Offset(_corners[0].dx * w, _corners[0].dy * h); // TL
-    final p1 = Offset(_corners[1].dx * w, _corners[1].dy * h); // TR
-    final p2 = Offset(_corners[2].dx * w, _corners[2].dy * h); // BR
-    final p3 = Offset(_corners[3].dx * w, _corners[3].dy * h); // BL
-
-    final topWidth = (p1 - p0).distance;
-    final bottomWidth = (p2 - p3).distance;
-    final leftHeight = (p3 - p0).distance;
-    final rightHeight = (p2 - p1).distance;
-
-    final outW = math.max(200, math.max(topWidth, bottomWidth).round());
-    final outH = math.max(200, math.max(leftHeight, rightHeight).round());
-
+    final outW = math.max(200, math.max((p1 - p0).distance, (p2 - p3).distance).round());
+    final outH = math.max(200, math.max((p3 - p0).distance, (p2 - p1).distance).round());
     final dstImg = img.Image(width: outW, height: outH);
 
     for (int y = 0; y < outH; y++) {
       final v = y / (outH - 1);
       for (int x = 0; x < outW; x++) {
         final u = x / (outW - 1);
-        final srcX = (1 - u) * (1 - v) * p0.dx +
-            u * (1 - v) * p1.dx +
-            u * v * p2.dx +
-            (1 - u) * v * p3.dx;
-        final srcY = (1 - u) * (1 - v) * p0.dy +
-            u * (1 - v) * p1.dy +
-            u * v * p2.dy +
-            (1 - u) * v * p3.dy;
-
+        final srcX = (1 - u) * (1 - v) * p0.dx + u * (1 - v) * p1.dx + u * v * p2.dx + (1 - u) * v * p3.dx;
+        final srcY = (1 - u) * (1 - v) * p0.dy + u * (1 - v) * p1.dy + u * v * p2.dy + (1 - u) * v * p3.dy;
         final sx = srcX.round().clamp(0, srcImg.width - 1);
         final sy = srcY.round().clamp(0, srcImg.height - 1);
         dstImg.setPixel(x, y, srcImg.getPixel(sx, sy));
       }
     }
-
     return Uint8List.fromList(img.encodeJpg(dstImg, quality: 92));
   }
 
@@ -2144,16 +1637,7 @@ class _FourCornerPerspectiveCropScreenState extends State<FourCornerPerspectiveC
         title: Text(widget.pageTitle, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         actions: [
           TextButton.icon(
-            onPressed: () {
-              setState(() {
-                _corners = [
-                  const Offset(0.02, 0.02),
-                  const Offset(0.98, 0.02),
-                  const Offset(0.98, 0.98),
-                  const Offset(0.02, 0.98),
-                ];
-              });
-            },
+            onPressed: () => setState(() => _corners = [const Offset(0.02, 0.02), const Offset(0.98, 0.02), const Offset(0.98, 0.98), const Offset(0.02, 0.98)]),
             icon: const Icon(Icons.select_all, color: kGoldAccent, size: 18),
             label: const Text('Full Page', style: TextStyle(color: kGoldAccent)),
           ),
@@ -2165,10 +1649,7 @@ class _FourCornerPerspectiveCropScreenState extends State<FourCornerPerspectiveC
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             color: kNavySecondary,
-            child: const Text(
-              'Drag any of the 4 corner pins or edge handles to perspective-crop the document.',
-              style: TextStyle(color: Colors.white70, fontSize: 12),
-            ),
+            child: const Text('Drag any of the 4 corner pins to perspective-crop the document.', style: TextStyle(color: Colors.white70, fontSize: 12)),
           ),
           Expanded(
             child: Padding(
@@ -2177,18 +1658,14 @@ class _FourCornerPerspectiveCropScreenState extends State<FourCornerPerspectiveC
                 builder: (context, constraints) {
                   final boxW = constraints.maxWidth;
                   final boxH = constraints.maxHeight;
-
                   return GestureDetector(
                     onPanStart: (details) {
                       final local = details.localPosition;
-                      final norm = Offset(
-                        (local.dx / boxW).clamp(0.0, 1.0),
-                        (local.dy / boxH).clamp(0.0, 1.0),
-                      );
+                      final norm = Offset((local.dx / boxW).clamp(0.0, 1.0), (local.dy / boxH).clamp(0.0, 1.0));
                       int closestIdx = 0;
                       double minDist = 999;
                       for (int i = 0; i < 4; i++) {
-                        final d = ( norm - _corners[i] ).distance;
+                        final d = (norm - _corners[i]).distance;
                         if (d < minDist) {
                           minDist = d;
                           closestIdx = i;
@@ -2204,54 +1681,21 @@ class _FourCornerPerspectiveCropScreenState extends State<FourCornerPerspectiveC
                     onPanUpdate: (details) {
                       if (_activeDragIndex == null) return;
                       final local = details.localPosition;
-                      final norm = Offset(
-                        (local.dx / boxW).clamp(0.0, 1.0),
-                        (local.dy / boxH).clamp(0.0, 1.0),
-                      );
+                      final norm = Offset((local.dx / boxW).clamp(0.0, 1.0), (local.dy / boxH).clamp(0.0, 1.0));
                       setState(() {
                         _corners[_activeDragIndex!] = norm;
                         _activeTouchNormalized = norm;
                       });
                     },
-                    onPanEnd: (_) {
-                      setState(() {
-                        _activeDragIndex = null;
-                        _activeTouchNormalized = null;
-                      });
-                    },
+                    onPanEnd: (_) => setState(() {
+                      _activeDragIndex = null;
+                      _activeTouchNormalized = null;
+                    }),
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
                         Image.memory(widget.imageBytes, fit: BoxFit.fill),
-                        CustomPaint(
-                          painter: _PerspectiveCropGridPainter(
-                            corners: _corners,
-                            activeCorner: _activeDragIndex,
-                          ),
-                        ),
-                        // Precision Magnifier Loupe in Top-Left while dragging
-                        if (_activeTouchNormalized != null && _decodedUiImage != null)
-                          Positioned(
-                            top: 8,
-                            left: _activeTouchNormalized!.dx < 0.45 ? null : 8,
-                            right: _activeTouchNormalized!.dx < 0.45 ? 8 : null,
-                            child: Container(
-                              width: 110,
-                              height: 110,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(color: kGoldAccent, width: 3),
-                                boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 10)],
-                              ),
-                              clipBehavior: Clip.antiAlias,
-                              child: CustomPaint(
-                                painter: _MagnifierLoupePainter(
-                                  image: _decodedUiImage!,
-                                  normalizedCenter: _activeTouchNormalized!,
-                                ),
-                              ),
-                            ),
-                          ),
+                        CustomPaint(painter: _PerspectiveCropGridPainter(corners: _corners, activeCorner: _activeDragIndex)),
                       ],
                     ),
                   );
@@ -2266,11 +1710,7 @@ class _FourCornerPerspectiveCropScreenState extends State<FourCornerPerspectiveC
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: const BorderSide(color: Colors.white38),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
+                    style: OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white38), padding: const EdgeInsets.symmetric(vertical: 14)),
                     onPressed: () => Navigator.pop(context, widget.imageBytes),
                     child: const Text('Skip Crop'),
                   ),
@@ -2279,11 +1719,7 @@ class _FourCornerPerspectiveCropScreenState extends State<FourCornerPerspectiveC
                 Expanded(
                   flex: 2,
                   child: FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: kGoldAccent,
-                      foregroundColor: kNavyPrimary,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
+                    style: FilledButton.styleFrom(backgroundColor: kGoldAccent, foregroundColor: kNavyPrimary, padding: const EdgeInsets.symmetric(vertical: 14)),
                     onPressed: _processingWarp
                         ? null
                         : () async {
@@ -2292,10 +1728,7 @@ class _FourCornerPerspectiveCropScreenState extends State<FourCornerPerspectiveC
                             if (mounted) Navigator.pop(context, warped);
                           },
                     icon: const Icon(Icons.crop_rotate),
-                    label: Text(
-                      _processingWarp ? 'Applying Perspective Warp...' : 'Apply Perspective Crop',
-                      style: const TextStyle(fontWeight: FontWeight.w900),
-                    ),
+                    label: Text(_processingWarp ? 'Applying...' : 'Apply Perspective Crop', style: const TextStyle(fontWeight: FontWeight.w900)),
                   ),
                 ),
               ],
@@ -2310,13 +1743,11 @@ class _FourCornerPerspectiveCropScreenState extends State<FourCornerPerspectiveC
 class _PerspectiveCropGridPainter extends CustomPainter {
   final List<Offset> corners;
   final int? activeCorner;
-
   _PerspectiveCropGridPainter({required this.corners, this.activeCorner});
 
   @override
   void paint(Canvas canvas, Size size) {
     final pts = corners.map((c) => Offset(c.dx * size.width, c.dy * size.height)).toList();
-
     final polyPath = Path()
       ..moveTo(pts[0].dx, pts[0].dy)
       ..lineTo(pts[1].dx, pts[1].dy)
@@ -2324,51 +1755,13 @@ class _PerspectiveCropGridPainter extends CustomPainter {
       ..lineTo(pts[3].dx, pts[3].dy)
       ..close();
 
-    // Dim outside area
-    final fullRect = Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height));
-    final outside = Path.combine(PathOperation.difference, fullRect, polyPath);
-    canvas.drawPath(outside, Paint()..color = Colors.black.withOpacity(0.55));
+    canvas.drawPath(Path.combine(PathOperation.difference, Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height)), polyPath), Paint()..color = Colors.black.withOpacity(0.55));
+    canvas.drawPath(polyPath, Paint()..color = kGoldAccent..style = PaintingStyle.stroke..strokeWidth = 2.8);
 
-    // Gold Perspective Outline
-    canvas.drawPath(
-      polyPath,
-      Paint()
-        ..color = kGoldAccent
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.8,
-    );
-
-    // Internal Rule-of-Thirds Perspective Grid Lines
-    final gridPaint = Paint()
-      ..color = Colors.white.withOpacity(0.35)
-      ..strokeWidth = 1;
-    for (int i = 1; i <= 2; i++) {
-      final t = i / 3.0;
-      final topPt = Offset.lerp(pts[0], pts[1], t)!;
-      final botPt = Offset.lerp(pts[3], pts[2], t)!;
-      canvas.drawLine(topPt, botPt, gridPaint);
-
-      final leftPt = Offset.lerp(pts[0], pts[3], t)!;
-      final rightPt = Offset.lerp(pts[1], pts[2], t)!;
-      canvas.drawLine(leftPt, rightPt, gridPaint);
-    }
-
-    // Draw 4 Corner Pins
     for (int i = 0; i < 4; i++) {
       final isCurrent = activeCorner == i;
-      canvas.drawCircle(
-        pts[i],
-        isCurrent ? 16 : 12,
-        Paint()..color = kNavyPrimary,
-      );
-      canvas.drawCircle(
-        pts[i],
-        isCurrent ? 16 : 12,
-        Paint()
-          ..color = kGoldAccent
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 3.5,
-      );
+      canvas.drawCircle(pts[i], isCurrent ? 16 : 12, Paint()..color = kNavyPrimary);
+      canvas.drawCircle(pts[i], isCurrent ? 16 : 12, Paint()..color = kGoldAccent..style = PaintingStyle.stroke..strokeWidth = 3.5);
       canvas.drawCircle(pts[i], 4, Paint()..color = Colors.white);
     }
   }
@@ -2377,60 +1770,13 @@ class _PerspectiveCropGridPainter extends CustomPainter {
   bool shouldRepaint(covariant _PerspectiveCropGridPainter oldDelegate) => true;
 }
 
-class _MagnifierLoupePainter extends CustomPainter {
-  final ui.Image image;
-  final Offset normalizedCenter;
-
-  _MagnifierLoupePainter({required this.image, required this.normalizedCenter});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final imgW = image.width.toDouble();
-    final imgH = image.height.toDouble();
-    final cx = normalizedCenter.dx * imgW;
-    final cy = normalizedCenter.dy * imgH;
-    final cropRadius = math.min(imgW, imgH) * 0.08;
-
-    final srcRect = Rect.fromCenter(
-      center: Offset(cx, cy),
-      width: cropRadius * 2,
-      height: cropRadius * 2,
-    );
-    final dstRect = Rect.fromLTWH(0, 0, size.width, size.height);
-    canvas.drawImageRect(image, srcRect, dstRect, Paint());
-
-    // Crosshair inside Loupe
-    final crossPaint = Paint()
-      ..color = kGoldAccent
-      ..strokeWidth = 1.8;
-    canvas.drawLine(Offset(size.width / 2, 0), Offset(size.width / 2, size.height), crossPaint);
-    canvas.drawLine(Offset(0, size.height / 2), Offset(size.width, size.height / 2), crossPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _MagnifierLoupePainter oldDelegate) => true;
-}
-
-// =============================================================================
-// 6. PDFELEMENT-STYLE IN-PLACE SELECTABLE OCR OVERLAY SCREEN
-//    (Select text directly on the picture without jumping to a separate screen!)
-// =============================================================================
-
 class InPlaceSelectableOcrScreen extends StatefulWidget {
   final Uint8List imageBytes;
   final int imageWidth;
   final int imageHeight;
-  final bool initialHindi;
   final ValueChanged<List<OcrWordBox>>? onOcrCompleted;
 
-  const InPlaceSelectableOcrScreen({
-    super.key,
-    required this.imageBytes,
-    required this.imageWidth,
-    required this.imageHeight,
-    this.initialHindi = false,
-    this.onOcrCompleted,
-  });
+  const InPlaceSelectableOcrScreen({super.key, required this.imageBytes, required this.imageWidth, required this.imageHeight, this.onOcrCompleted});
 
   @override
   State<InPlaceSelectableOcrScreen> createState() => _InPlaceSelectableOcrScreenState();
@@ -2440,12 +1786,10 @@ class _InPlaceSelectableOcrScreenState extends State<InPlaceSelectableOcrScreen>
   List<OcrWordBox> _wordBoxes = [];
   final Set<int> _selectedIndices = {};
   bool _runningOcr = true;
-  late bool _useHindi;
 
   @override
   void initState() {
     super.initState();
-    _useHindi = widget.initialHindi;
     _performInPlaceOcr();
   }
 
@@ -2460,22 +1804,14 @@ class _InPlaceSelectableOcrScreenState extends State<InPlaceSelectableOcrScreen>
     final tmpFile = File(p.join(tmpDir.path, 'inplace_ocr_tmp.png'));
     await tmpFile.writeAsBytes(widget.imageBytes);
 
-    final recognizer = TextRecognizer(
-      script: _useHindi ? TextRecognitionScript.devanagari : TextRecognitionScript.latin,
-    );
-
+    final recognizer = TextRecognizer(script: TextRecognitionScript.latin);
     try {
       final recognized = await recognizer.processImage(InputImage.fromFilePath(tmpFile.path));
       final List<OcrWordBox> boxes = [];
       for (final block in recognized.blocks) {
         for (final line in block.lines) {
           for (final element in line.elements) {
-            boxes.add(
-              OcrWordBox(
-                text: element.text,
-                boundingBox: element.boundingBox,
-              ),
-            );
+            boxes.add(OcrWordBox(text: element.text, boundingBox: element.boundingBox));
           }
         }
       }
@@ -2511,36 +1847,22 @@ class _InPlaceSelectableOcrScreenState extends State<InPlaceSelectableOcrScreen>
           ],
         ),
         actions: [
-          TextButton.icon(
-            onPressed: () {
-              setState(() => _useHindi = !_useHindi);
-              _performInPlaceOcr();
-            },
-            icon: const Icon(Icons.translate, color: Colors.white, size: 18),
-            label: Text(
-              _useHindi ? 'Hindi+Eng' : 'English',
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-            ),
-          ),
           IconButton(
             tooltip: 'Select All Words on Page',
             icon: const Icon(Icons.select_all),
-            onPressed: () {
-              setState(() {
-                if (_selectedIndices.length == _wordBoxes.length) {
-                  _selectedIndices.clear();
-                } else {
-                  _selectedIndices.addAll(List.generate(_wordBoxes.length, (i) => i));
-                }
-              });
-            },
+            onPressed: () => setState(() {
+              if (_selectedIndices.length == _wordBoxes.length) {
+                _selectedIndices.clear();
+              } else {
+                _selectedIndices.addAll(List.generate(_wordBoxes.length, (i) => i));
+              }
+            }),
           ),
         ],
       ),
       body: Column(
         children: [
-          if (_runningOcr)
-            const LinearProgressIndicator(color: kGoldAccent),
+          if (_runningOcr) const LinearProgressIndicator(color: kGoldAccent),
           Expanded(
             child: Center(
               child: AspectRatio(
@@ -2555,12 +1877,7 @@ class _InPlaceSelectableOcrScreenState extends State<InPlaceSelectableOcrScreen>
                         final pt = details.localPosition;
                         for (int i = 0; i < _wordBoxes.length; i++) {
                           final r = _wordBoxes[i].boundingBox;
-                          final scaledRect = Rect.fromLTRB(
-                            r.left * scaleX,
-                            r.top * scaleY,
-                            r.right * scaleX,
-                            r.bottom * scaleY,
-                          );
+                          final scaledRect = Rect.fromLTRB(r.left * scaleX, r.top * scaleY, r.right * scaleX, r.bottom * scaleY);
                           if (scaledRect.inflate(4).contains(pt)) {
                             setState(() => _selectedIndices.add(i));
                           }
@@ -2570,38 +1887,27 @@ class _InPlaceSelectableOcrScreenState extends State<InPlaceSelectableOcrScreen>
                         fit: StackFit.expand,
                         children: [
                           Image.memory(widget.imageBytes, fit: BoxFit.fill),
-                          // Transparent Interactive Word Bounding Boxes Mapped Directly Over Image
                           ...List.generate(_wordBoxes.length, (i) {
                             final wb = _wordBoxes[i];
                             final r = wb.boundingBox;
                             final isSelected = _selectedIndices.contains(i);
-
                             return Positioned(
                               left: r.left * scaleX,
                               top: r.top * scaleY,
                               width: math.max(8, r.width * scaleX),
                               height: math.max(8, r.height * scaleY),
                               child: GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    if (isSelected) {
-                                      _selectedIndices.remove(i);
-                                    } else {
-                                      _selectedIndices.add(i);
-                                    }
-                                  });
-                                },
+                                onTap: () => setState(() {
+                                  if (isSelected) {
+                                    _selectedIndices.remove(i);
+                                  } else {
+                                    _selectedIndices.add(i);
+                                  }
+                                }),
                                 child: Container(
                                   decoration: BoxDecoration(
-                                    color: isSelected
-                                        ? const Color(0xFF2563EB).withOpacity(0.42)
-                                        : kGoldAccent.withOpacity(0.14),
-                                    border: Border.all(
-                                      color: isSelected
-                                          ? const Color(0xFF60A5FA)
-                                          : kGoldAccent.withOpacity(0.55),
-                                      width: isSelected ? 1.5 : 0.7,
-                                    ),
+                                    color: isSelected ? const Color(0xFF2563EB).withOpacity(0.42) : kGoldAccent.withOpacity(0.14),
+                                    border: Border.all(color: isSelected ? const Color(0xFF60A5FA) : kGoldAccent.withOpacity(0.55), width: isSelected ? 1.5 : 0.7),
                                     borderRadius: BorderRadius.circular(2),
                                   ),
                                 ),
@@ -2616,7 +1922,6 @@ class _InPlaceSelectableOcrScreenState extends State<InPlaceSelectableOcrScreen>
               ),
             ),
           ),
-          // Floating Selection Bar at Bottom
           Container(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
             color: kNavySecondary,
@@ -2624,9 +1929,7 @@ class _InPlaceSelectableOcrScreenState extends State<InPlaceSelectableOcrScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _selectedIndices.isEmpty
-                      ? 'Detected ${_wordBoxes.length} words on page. Tap or drag over words on the picture to copy.'
-                      : 'Selected (${_selectedIndices.length} words): $_selectedTextString',
+                  _selectedIndices.isEmpty ? 'Tap or drag over words on the picture to select.' : 'Selected (${_selectedIndices.length} words): $_selectedTextString',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: Colors.white, fontSize: 12.5),
@@ -2636,32 +1939,22 @@ class _InPlaceSelectableOcrScreenState extends State<InPlaceSelectableOcrScreen>
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          side: const BorderSide(color: Colors.white30),
-                        ),
-                        onPressed: _selectedIndices.isEmpty
-                            ? null
-                            : () => setState(() => _selectedIndices.clear()),
+                        style: OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white30)),
+                        onPressed: _selectedIndices.isEmpty ? null : () => setState(() => _selectedIndices.clear()),
                         icon: const Icon(Icons.clear, size: 16),
-                        label: const Text('Clear Selection'),
+                        label: const Text('Clear'),
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       flex: 2,
                       child: FilledButton.icon(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: kGoldAccent,
-                          foregroundColor: kNavyPrimary,
-                        ),
+                        style: FilledButton.styleFrom(backgroundColor: kGoldAccent, foregroundColor: kNavyPrimary),
                         onPressed: _selectedIndices.isEmpty
                             ? null
                             : () {
                                 Clipboard.setData(ClipboardData(text: _selectedTextString));
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Copied selected text from image!')),
-                                );
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Copied selected text from image!')));
                               },
                         icon: const Icon(Icons.copy, size: 18),
                         label: const Text('Copy Selected Text', style: TextStyle(fontWeight: FontWeight.w900)),
@@ -2677,11 +1970,6 @@ class _InPlaceSelectableOcrScreenState extends State<InPlaceSelectableOcrScreen>
     );
   }
 }
-
-// =============================================================================
-// 7. COMPLETE ACROBAT & SCAN DOCUMENT STUDIO
-//    (Filters, Crop, In-Place OCR, Signature Pad, Stamps, White-Out, Reorder)
-// =============================================================================
 
 class AcrobatDocumentStudioScreen extends StatefulWidget {
   final List<EditableDocumentPage> initialPages;
@@ -2776,18 +2064,11 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
               Expanded(
                 child: Container(
                   width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: kSurfaceBg,
-                    border: Border.all(color: const Color(0xFF94A3B8)),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  decoration: BoxDecoration(color: kSurfaceBg, border: Border.all(color: const Color(0xFF94A3B8)), borderRadius: BorderRadius.circular(12)),
                   child: GestureDetector(
                     onPanUpdate: (d) => setModal(() => points.add(d.localPosition)),
                     onPanEnd: (_) => setModal(() => points.add(null)),
-                    child: CustomPaint(
-                      painter: _InkSignaturePainter(points: points),
-                      size: Size.infinite,
-                    ),
+                    child: CustomPaint(painter: _InkSignaturePainter(points: points), size: Size.infinite),
                   ),
                 ),
               ),
@@ -2802,9 +2083,7 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                     final pic = recorder.endRecording();
                     final uiImg = await pic.toImage(400, 180);
                     final byteData = await uiImg.toByteData(format: ui.ImageByteFormat.png);
-                    if (ctx.mounted) {
-                      Navigator.pop(ctx, byteData?.buffer.asUint8List());
-                    }
+                    if (ctx.mounted) Navigator.pop(ctx, byteData?.buffer.asUint8List());
                   },
                   icon: const Icon(Icons.check),
                   label: const Text('Stamp Signature onto Page'),
@@ -2819,11 +2098,7 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
     if (sigBytes != null) {
       setState(() {
         _currentPage.annotations.add(
-          PageAnnotationItem(
-            type: 'signature',
-            normalizedPos: const Offset(0.68, 0.82),
-            signaturePng: sigBytes,
-          ),
+          PageAnnotationItem(type: 'signature', normalizedPos: const Offset(0.68, 0.82), signaturePng: sigBytes),
         );
       });
     }
@@ -2857,14 +2132,7 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                   onPressed: () {
                     Navigator.pop(ctx);
                     setState(() {
-                      _currentPage.annotations.add(
-                        PageAnnotationItem(
-                          type: 'stamp',
-                          text: s.$1,
-                          color: s.$2,
-                          normalizedPos: const Offset(0.65, 0.72),
-                        ),
-                      );
+                      _currentPage.annotations.add(PageAnnotationItem(type: 'stamp', text: s.$1, color: s.$2, normalizedPos: const Offset(0.65, 0.72)));
                     });
                   },
                 );
@@ -2878,12 +2146,7 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
               onTap: () {
                 Navigator.pop(ctx);
                 setState(() {
-                  _currentPage.annotations.add(
-                    PageAnnotationItem(
-                      type: 'whiteout',
-                      normalizedPos: const Offset(0.5, 0.5),
-                    ),
-                  );
+                  _currentPage.annotations.add(PageAnnotationItem(type: 'whiteout', normalizedPos: const Offset(0.5, 0.5)));
                 });
               },
             ),
@@ -2893,15 +2156,12 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
     );
   }
 
-  /// Compiles all pages into a final PDF with an embedded invisible selectable OCR layer (PDFelement style!)
   Future<void> _compileAndSaveFinalPdf() async {
     setState(() => _compilingPdf = true);
 
     try {
       final pdf = pw.Document();
-      final recognizer = TextRecognizer(
-        script: widget.preferHindiOcr ? TextRecognitionScript.devanagari : TextRecognitionScript.latin,
-      );
+      final recognizer = TextRecognizer(script: TextRecognitionScript.latin);
       final tmpDir = await getTemporaryDirectory();
 
       for (int i = 0; i < _pages.length; i++) {
@@ -2912,7 +2172,6 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
           rotate: pItem.rotationQuarterTurns * 90,
         );
 
-        // If user enabled Searchable PDF Layer and OCR hasn't run on this page yet, run it automatically
         if (_embedSearchableOcrLayer && pItem.ocrWords.isEmpty) {
           final tmpFile = File(p.join(tmpDir.path, 'pdf_ocr_$i.jpg'));
           await tmpFile.writeAsBytes(compressed);
@@ -2937,58 +2196,32 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
             margin: pw.EdgeInsets.zero,
             build: (_) => pw.Stack(
               children: [
-                pw.Positioned.fill(
-                  child: pw.Image(pw.MemoryImage(compressed), fit: pw.BoxFit.fill),
-                ),
-                // Invisible Selectable Text Layer Mapped to Exact Coordinates (PDFelement / Acrobat Pro style)
+                pw.Positioned.fill(child: pw.Image(pw.MemoryImage(compressed), fit: pw.BoxFit.fill)),
                 ...pItem.ocrWords.map((wb) {
                   return pw.Positioned(
                     left: wb.boundingBox.left * scaleX,
                     top: wb.boundingBox.top * scaleY,
                     child: pw.Opacity(
                       opacity: 0.01,
-                      child: pw.Text(
-                        wb.text,
-                        style: pw.TextStyle(
-                          fontSize: math.max(6, wb.boundingBox.height * scaleY * 0.8),
-                        ),
-                      ),
+                      child: pw.Text(wb.text, style: pw.TextStyle(fontSize: math.max(6, wb.boundingBox.height * scaleY * 0.8))),
                     ),
                   );
                 }),
-                // Render Stamps, Whiteout & Signatures onto PDF Page
                 ...pItem.annotations.map((ann) {
                   final dx = (ann.normalizedPos.dx * pageW).clamp(10.0, pageW - 120.0);
                   final dy = (ann.normalizedPos.dy * pageH).clamp(10.0, pageH - 60.0);
                   if (ann.type == 'whiteout') {
-                    return pw.Positioned(
-                      left: dx,
-                      top: dy,
-                      child: pw.Container(width: 110, height: 32, color: PdfColors.white),
-                    );
+                    return pw.Positioned(left: dx, top: dy, child: pw.Container(width: 110, height: 32, color: PdfColors.white));
                   } else if (ann.type == 'signature' && ann.signaturePng != null) {
-                    return pw.Positioned(
-                      left: dx,
-                      top: dy,
-                      child: pw.Image(pw.MemoryImage(ann.signaturePng!), width: 130, height: 60),
-                    );
+                    return pw.Positioned(left: dx, top: dy, child: pw.Image(pw.MemoryImage(ann.signaturePng!), width: 130, height: 60));
                   } else {
                     return pw.Positioned(
                       left: dx,
                       top: dy,
                       child: pw.Container(
                         padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: pw.BoxDecoration(
-                          border: pw.Border.all(color: PdfColors.red800, width: 2),
-                        ),
-                        child: pw.Text(
-                          ann.text,
-                          style: pw.TextStyle(
-                            color: PdfColors.red800,
-                            fontWeight: pw.FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
+                        decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.red800, width: 2)),
+                        child: pw.Text(ann.text, style: pw.TextStyle(color: PdfColors.red800, fontWeight: pw.FontWeight.bold, fontSize: 12)),
                       ),
                     );
                   }
@@ -3004,10 +2237,7 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
       await widget.onSaveDocument(finalBytes, _titleCtrl.text.trim());
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Saved Searchable PDF to AN Scan Vault!'),
-            backgroundColor: Color(0xFF15803D),
-          ),
+          const SnackBar(content: Text('Saved Searchable PDF to AN Scan Vault!'), backgroundColor: Color(0xFF15803D)),
         );
         Navigator.pop(context);
       }
@@ -3032,14 +2262,7 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                 final bytes = await File(shot.path).readAsBytes();
                 final dec = img.decodeImage(bytes);
                 setState(() {
-                  _pages.add(
-                    EditableDocumentPage(
-                      originalBytes: bytes,
-                      displayBytes: bytes,
-                      imageWidth: dec?.width ?? 1000,
-                      imageHeight: dec?.height ?? 1400,
-                    ),
-                  );
+                  _pages.add(EditableDocumentPage(originalBytes: bytes, displayBytes: bytes, imageWidth: dec?.width ?? 1000, imageHeight: dec?.height ?? 1400));
                   _currentIndex = _pages.length - 1;
                 });
               }
@@ -3051,9 +2274,7 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
             onPressed: () {
               setState(() {
                 _pages.removeAt(_currentIndex);
-                if (_currentIndex >= _pages.length && _currentIndex > 0) {
-                  _currentIndex--;
-                }
+                if (_currentIndex >= _pages.length && _currentIndex > 0) _currentIndex--;
               });
               if (_pages.isEmpty) Navigator.pop(context);
             },
@@ -3062,7 +2283,6 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
       ),
       body: Column(
         children: [
-          // Top Document Name & Searchable OCR Toggle Bar
           Container(
             color: kNavySecondary,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -3089,7 +2309,6 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
               ],
             ),
           ),
-          // Interactive Page Canvas with Draggable Stamps, Signatures & Whiteout
           Expanded(
             child: PageView.builder(
               itemCount: _pages.length,
@@ -3103,33 +2322,19 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                       return Stack(
                         alignment: Alignment.center,
                         children: [
-                          RotatedBox(
-                            quarterTurns: page.rotationQuarterTurns,
-                            child: Image.memory(page.displayBytes, fit: BoxFit.contain),
-                          ),
-                          // Draggable Annotations (Stamps, Signatures, White-Out)
+                          RotatedBox(quarterTurns: page.rotationQuarterTurns, child: Image.memory(page.displayBytes, fit: BoxFit.contain)),
                           ...List.generate(page.annotations.length, (annIdx) {
                             final ann = page.annotations[annIdx];
                             return Positioned(
                               left: ann.normalizedPos.dx * constraints.maxWidth - 50,
                               top: ann.normalizedPos.dy * constraints.maxHeight - 20,
                               child: GestureDetector(
-                                onPanUpdate: (d) {
-                                  setState(() {
-                                    final newX = (ann.normalizedPos.dx + d.delta.dx / constraints.maxWidth).clamp(0.05, 0.95);
-                                    final newY = (ann.normalizedPos.dy + d.delta.dy / constraints.maxHeight).clamp(0.05, 0.95);
-                                    page.annotations[annIdx] = PageAnnotationItem(
-                                      type: ann.type,
-                                      text: ann.text,
-                                      color: ann.color,
-                                      signaturePng: ann.signaturePng,
-                                      normalizedPos: Offset(newX, newY),
-                                    );
-                                  });
-                                },
-                                onLongPress: () {
-                                  setState(() => page.annotations.removeAt(annIdx));
-                                },
+                                onPanUpdate: (d) => setState(() {
+                                  final newX = (ann.normalizedPos.dx + d.delta.dx / constraints.maxWidth).clamp(0.05, 0.95);
+                                  final newY = (ann.normalizedPos.dy + d.delta.dy / constraints.maxHeight).clamp(0.05, 0.95);
+                                  page.annotations[annIdx] = PageAnnotationItem(type: ann.type, text: ann.text, color: ann.color, signaturePng: ann.signaturePng, normalizedPos: Offset(newX, newY));
+                                }),
+                                onLongPress: () => setState(() => page.annotations.removeAt(annIdx)),
                                 child: _buildAnnotationWidget(ann),
                               ),
                             );
@@ -3142,7 +2347,6 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
               },
             ),
           ),
-          // Filter Strip
           Container(
             height: 44,
             color: kNavySecondary,
@@ -3153,16 +2357,11 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                 final selected = _currentPage.activeFilter == f;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Text(f.label, style: const TextStyle(fontSize: 11.5)),
-                    selected: selected,
-                    onSelected: (_) => _applyFilterToCurrentPage(f),
-                  ),
+                  child: ChoiceChip(label: Text(f.label, style: const TextStyle(fontSize: 11.5)), selected: selected, onSelected: (_) => _applyFilterToCurrentPage(f)),
                 );
               }).toList(),
             ),
           ),
-          // Acrobat & Scan Action Toolbar (4-Corner Crop, In-Place OCR, Rotate, Sign, Stamp)
           Container(
             color: kNavyPrimary,
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 14),
@@ -3179,10 +2378,7 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                           final warped = await Navigator.push<Uint8List>(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => FourCornerPerspectiveCropScreen(
-                                imageBytes: _currentPage.originalBytes,
-                                pageTitle: '4-Corner Perspective Crop',
-                              ),
+                              builder: (_) => FourCornerPerspectiveCropScreen(imageBytes: _currentPage.originalBytes, pageTitle: '4-Corner Perspective Crop'),
                             ),
                           );
                           if (warped != null) {
@@ -3194,45 +2390,23 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                         },
                       ),
                       _studioActionBtn(
-                        icon: Icons.text_Snippet_outlined,
-                        fallback: Icons.manage_search_rounded,
+                        icon: Icons.text_snippet_outlined,
                         label: 'In-Place OCR',
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => InPlaceSelectableOcrScreen(
-                                imageBytes: _currentPage.displayBytes,
-                                imageWidth: _currentPage.imageWidth,
-                                imageHeight: _currentPage.imageHeight,
-                                initialHindi: widget.preferHindiOcr,
-                                onOcrCompleted: (words) {
-                                  _currentPage.ocrWords = words;
-                                },
-                              ),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => InPlaceSelectableOcrScreen(
+                              imageBytes: _currentPage.displayBytes,
+                              imageWidth: _currentPage.imageWidth,
+                              imageHeight: _currentPage.imageHeight,
+                              onOcrCompleted: (words) => _currentPage.ocrWords = words,
                             ),
-                          );
-                        },
+                          ),
+                        ),
                       ),
-                      _studioActionBtn(
-                        icon: Icons.rotate_right,
-                        label: 'Rotate 90°',
-                        onTap: () {
-                          setState(() {
-                            _currentPage.rotationQuarterTurns = (_currentPage.rotationQuarterTurns + 1) % 4;
-                          });
-                        },
-                      ),
-                      _studioActionBtn(
-                        icon: Icons.draw_outlined,
-                        label: 'Sign Ink',
-                        onTap: _openSignaturePadModal,
-                      ),
-                      _studioActionBtn(
-                        icon: Icons.approval_outlined,
-                        label: 'Stamp / Erase',
-                        onTap: _openExecutiveStampSelector,
-                      ),
+                      _studioActionBtn(icon: Icons.rotate_right, label: 'Rotate 90°', onTap: () => setState(() => _currentPage.rotationQuarterTurns = (_currentPage.rotationQuarterTurns + 1) % 4)),
+                      _studioActionBtn(icon: Icons.draw_outlined, label: 'Sign Ink', onTap: _openSignaturePadModal),
+                      _studioActionBtn(icon: Icons.approval_outlined, label: 'Stamp / Erase', onTap: _openExecutiveStampSelector),
                     ],
                   ),
                 ),
@@ -3252,17 +2426,10 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                       ),
                     ),
                     FilledButton.icon(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: kGoldAccent,
-                        foregroundColor: kNavyPrimary,
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                      ),
+                      style: FilledButton.styleFrom(backgroundColor: kGoldAccent, foregroundColor: kNavyPrimary, padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12)),
                       onPressed: _compilingPdf ? null : _compileAndSaveFinalPdf,
                       icon: const Icon(Icons.save_alt, size: 18),
-                      label: Text(
-                        _compilingPdf ? 'Compiling...' : 'Save PDF',
-                        style: const TextStyle(fontWeight: FontWeight.w900),
-                      ),
+                      label: Text(_compilingPdf ? 'Compiling...' : 'Save PDF', style: const TextStyle(fontWeight: FontWeight.w900)),
                     ),
                   ],
                 ),
@@ -3274,22 +2441,13 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
     );
   }
 
-  Widget _studioActionBtn({
-    required IconData icon,
-    IconData? fallback,
-    required String label,
-    required VoidCallback onTap,
-  }) {
+  Widget _studioActionBtn({required IconData icon, required String label, required VoidCallback onTap}) {
     return Padding(
       padding: const EdgeInsets.only(right: 10),
       child: OutlinedButton.icon(
-        style: OutlinedButton.styleFrom(
-          foregroundColor: Colors.white,
-          side: const BorderSide(color: Colors.white24),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        ),
+        style: OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white24), padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
         onPressed: onTap,
-        icon: Icon(fallback ?? icon, size: 17, color: kGoldAccent),
+        icon: Icon(icon, size: 17, color: kGoldAccent),
         label: Text(label, style: const TextStyle(fontSize: 12)),
       ),
     );
@@ -3297,28 +2455,14 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
 
   Widget _buildAnnotationWidget(PageAnnotationItem ann) {
     if (ann.type == 'whiteout') {
-      return Container(
-        width: 110,
-        height: 32,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: Colors.grey.shade400, width: 1),
-        ),
-      );
+      return Container(width: 110, height: 32, decoration: BoxDecoration(color: Colors.white, border: Border.all(color: Colors.grey.shade400, width: 1)));
     } else if (ann.type == 'signature' && ann.signaturePng != null) {
       return Image.memory(ann.signaturePng!, width: 130, height: 60);
     } else {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          border: Border.all(color: ann.color, width: 2.2),
-          borderRadius: BorderRadius.circular(4),
-          color: Colors.white.withOpacity(0.85),
-        ),
-        child: Text(
-          ann.text,
-          style: TextStyle(color: ann.color, fontWeight: FontWeight.w900, fontSize: 12),
-        ),
+        decoration: BoxDecoration(border: Border.all(color: ann.color, width: 2.2), borderRadius: BorderRadius.circular(4), color: Colors.white.withOpacity(0.85)),
+        child: Text(ann.text, style: TextStyle(color: ann.color, fontWeight: FontWeight.w900, fontSize: 12)),
       );
     }
   }
