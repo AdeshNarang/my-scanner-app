@@ -1,7 +1,7 @@
 name: an_office
 description: AN Office - Executive Document & Productivity Studio by Adesh Narang.
 publish_to: 'none'
-version: 2.0.0+1
+version: 3.0.0+3
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -10,24 +10,24 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # Core Document Scanner & OCR (Offline ML Kit)
+  # Offline AI Document Scanner & Bilingual OCR (Latin + Devanagari)
   google_mlkit_document_scanner: ^0.2.1
   google_mlkit_text_recognition: ^0.13.0
 
-  # PDF Creation, Rendering & Printing
+  # PDF Engine, Viewer & Wireless Printing
   pdf: ^3.11.1
   printing: ^5.13.2
 
-  # Image Picking, Cropping & Compression
+  # Camera, Manual Cropper & Tiered Compression
   image_picker: ^1.1.2
   image_cropper: ^8.0.2
   flutter_image_compress: ^2.3.0
 
-  # Office Formats (Excel, Word/Archive, CSV/Text)
-  excel: ^4.0.6
-  archive: ^3.6.1
+  # Office Document Engines (Excel .xlsx & Word .docx / Zip)
+  excel: ^4.0.3
+  archive: ^3.4.10
 
-  # System Integration, File Handling & Sharing
+  # Storage, Sharing, System Intents & Utilities
   path_provider: ^2.1.4
   path: ^1.9.0
   share_plus: ^10.0.2
@@ -39,15 +39,6 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^4.0.0
-  flutter_launcher_icons: ^0.13.1
-
-flutter_launcher_icons:
-  android: true
-  ios: false
-  image_path: "assets/icon.png"
-  adaptive_icon_background: "#0F172A"
-  adaptive_icon_foreground: "assets/icon.png"
 
 flutter:
   uses-material-design: true
