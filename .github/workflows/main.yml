@@ -71,8 +71,8 @@ jobs:
                   applicationId = "in.adeshnarang.an_scan"
                   minSdk = 24
                   targetSdk = 35
-                  versionCode = 12
-                  versionName = "6.0.0"
+                  versionCode = 15
+                  versionName = "7.0.0"
                   multiDexEnabled = true
               }
 
@@ -148,18 +148,42 @@ jobs:
           </manifest>
           EOF
 
-      - name: Process & Integrate Custom Logo into Android Mipmaps
+      - name: Generate Executive Monogram App Icon
         run: |
-          sudo apt-get update -y && sudo apt-get install -y imagemagick
-          if [ ! -f "assets/logo.png" ]; then
-            echo "Error: assets/logo.png not found!"
-            exit 1
-          fi
-          convert assets/logo.png -resize 48x48 android/app/src/main/res/mipmap-mdpi/ic_launcher.png
-          convert assets/logo.png -resize 72x72 android/app/src/main/res/mipmap-hdpi/ic_launcher.png
-          convert assets/logo.png -resize 96x96 android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
-          convert assets/logo.png -resize 144x144 android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
-          convert assets/logo.png -resize 192x192 android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          python3 - << 'EOF'
+          import zlib, struct
+          w, h = 256, 256
+          navy = (15, 23, 42, 255)
+          gold = (212, 175, 55, 255)
+          white = (255, 255, 255, 255)
+          grid = [[navy for _ in range(w)] for _ in range(h)]
+          for y in range(20, 236):
+              for x in range(20, 236):
+                  if x < 30 or x >= 226 or y < 30 or y >= 226:
+                      grid[y][x] = gold
+          for y in range(75, 185):
+              for x in range(55, 120):
+                  if x < 70 or x >= 105 or (y < 90) or (122 <= y <= 136):
+                      grid[y][x] = white if not (122 <= y <= 136) else gold
+          for y in range(75, 185):
+              for x in range(136, 201):
+                  diag = 136 + int((y - 75) * (50.0 / 110.0))
+                  if x < 151 or x >= 186:
+                      grid[y][x] = white
+                  elif diag <= x <= diag + 14:
+                      grid[y][x] = gold
+          raw = bytearray()
+          for row in grid:
+              raw.append(0)
+              for r, g, b, a in row:
+                  raw.extend((r, g, b, a))
+          def chunk(tag, data):
+              return struct.pack("!I", len(data)) + tag + data + struct.pack("!I", zlib.crc32(tag + data) & 0xffffffff)
+          png = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack("!IIBBBBB", w, h, 8, 6, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(bytes(raw), 9)) + chunk(b"IEND", b"")
+          for folder in ["mipmap-mdpi", "mipmap-hdpi", "mipmap-xhdpi", "mipmap-xxhdpi", "mipmap-xxxhdpi"]:
+              with open(f"android/app/src/main/res/{folder}/ic_launcher.png", "wb") as f:
+                  f.write(png)
+          EOF
 
       - name: Clean Build Cache & Get Packages
         run: |
