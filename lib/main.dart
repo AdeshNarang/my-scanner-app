@@ -1,13 +1,12 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 
 import 'package:archive/archive.dart';
 import 'package:excel/excel.dart' as xls;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
@@ -18,6 +17,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -41,7 +41,7 @@ class ANScanApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF0F172A),
           primary: const Color(0xFF0F172A),
-          secondary: const Color(0xFFB45309),
+          secondary: const Color(0xFFD4AF37),
           surface: Colors.white,
         ),
         appBarTheme: const AppBarTheme(
@@ -62,7 +62,6 @@ class VaultFile {
   final String ext;
   final DateTime modified;
   final int sizeBytes;
-  final bool isLocked;
 
   VaultFile({
     required this.name,
@@ -70,7 +69,6 @@ class VaultFile {
     required this.ext,
     required this.modified,
     required this.sizeBytes,
-    this.isLocked = false,
   });
 }
 
@@ -84,21 +82,56 @@ class ExecutiveMasterShell extends StatefulWidget {
 class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
   int _tabIndex = 0;
   List<VaultFile> _vaultFiles = [];
-  Set<String> _lockedFileNames = {};
   String _searchQuery = '';
-  String _selectedCategory = 'ALL';
-
   List<String> _accounts = ['Adesh Narang (Admin)', 'Head Office Desk', 'Personal Vault'];
   String _currentAccount = 'Adesh Narang (Admin)';
   String? _masterPin;
   bool _isVaultUnlocked = false;
-  bool _autoCloudSync = true;
   int _defaultCompression = 75;
+  StreamSubscription? _intentSub;
 
   @override
   void initState() {
     super.initState();
     _initWorkspace();
+    _initIntentListener();
+  }
+
+  @override
+  void dispose() {
+    _intentSub?.cancel();
+    super.dispose();
+  }
+
+  void _initIntentListener() {
+    _intentSub = ReceiveSharingIntent.instance.getMediaStream().listen((value) {
+      _handleSharedFiles(value);
+    }, onError: (err) {});
+
+    ReceiveSharingIntent.instance.getInitialMedia().then((value) {
+      _handleSharedFiles(value);
+      ReceiveSharingIntent.instance.reset();
+    });
+  }
+
+  Future<void> _handleSharedFiles(List<SharedMediaFile> files) async {
+    if (files.isEmpty) return;
+    final vaultDir = await _getAccountVaultDir();
+    for (var file in files) {
+      if (file.path.isNotEmpty) {
+        final src = File(file.path);
+        if (await src.exists()) {
+          final dest = p.join(vaultDir.path, p.basename(file.path));
+          await src.copy(dest);
+        }
+      }
+    }
+    await _reloadVault();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Successfully imported file via Open With intent!')),
+      );
+    }
   }
 
   Future<void> _initWorkspace() async {
@@ -108,9 +141,7 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
           ['Adesh Narang (Admin)', 'Head Office Desk', 'Personal Vault'];
       _currentAccount = prefs.getString('active_account') ?? _accounts.first;
       _masterPin = prefs.getString('master_pin');
-      _autoCloudSync = prefs.getBool('auto_cloud_sync') ?? true;
       _defaultCompression = prefs.getInt('default_compression') ?? 75;
-      _lockedFileNames = (prefs.getStringList('locked_files') ?? []).toSet();
       _isVaultUnlocked = (_masterPin == null || _masterPin!.isEmpty);
     });
     await _reloadVault();
@@ -144,7 +175,6 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
               ext: ext,
               modified: stat.modified,
               sizeBytes: stat.size,
-              isLocked: _lockedFileNames.contains(name),
             ),
           );
         }
@@ -213,7 +243,7 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
   }
 
   // ===========================================================================
-  // UNIVERSAL FORMAT CONVERTER HUB DIALOG
+  // UNIVERSAL FORMAT CONVERTER HUB
   // ===========================================================================
   void _openConverterHub() {
     showModalBottomSheet(
@@ -221,35 +251,28 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
       isScrollControlled: true,
       builder: (ctx) => Container(
         padding: const EdgeInsets.all(20),
-        height: MediaQuery.of(context).size.height * 0.7,
+        height: MediaQuery.of(context).size.height * 0.75,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Universal Format Converter Hub',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-                ),
+                const Text('Universal Format Converter Hub', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
                 IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close)),
               ],
             ),
-            const Text(
-              'Select a conversion workflow to execute instantly:',
-              style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
-            ),
+            const Text('Select a bidirectional conversion workflow:', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
             const Divider(height: 24),
             Expanded(
               child: ListView(
                 children: [
                   _converterTile(
                     icon: Icons.picture_as_pdf,
-                    title: 'PDF to Image (JPG / PNG)',
-                    sub: 'Extract PDF pages into high-res image files',
+                    title: 'PDF to Image (JPG/PNG)',
+                    sub: 'Extract PDF pages into standalone high-res images',
                     onTap: () async {
                       Navigator.pop(ctx);
-                      // Pick PDF from vault or storage
                       final res = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['pdf']);
                       if (res != null && res.files.single.path != null) {
                         final bytes = await File(res.files.single.path!).readAsBytes();
@@ -257,7 +280,7 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
                         int pageNum = 1;
                         await for (final page in Printing.raster(bytes, dpi: 200)) {
                           final png = await page.toPng();
-                          await File(p.join(vaultDir.path, 'Page_$pageNum.jpg')).writeAsBytes(png);
+                          await File(p.join(vaultDir.path, 'Extracted_Page_$pageNum.jpg')).writeAsBytes(png);
                           pageNum++;
                         }
                         await _reloadVault();
@@ -296,7 +319,7 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
                         await recognizer.close();
                         final vaultDir = await _getAccountVaultDir();
                         final docxBytes = _createDocx(sb.toString());
-                        await File(p.join(vaultDir.path, 'Converted_Doc.docx')).writeAsBytes(docxBytes);
+                        await File(p.join(vaultDir.path, 'Converted_Document.docx')).writeAsBytes(docxBytes);
                         await _reloadVault();
                         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Converted PDF to Word (.docx)!')));
                       }
@@ -304,8 +327,8 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
                   ),
                   _converterTile(
                     icon: Icons.table_chart_outlined,
-                    title: 'Excel (.xlsx) to PDF',
-                    sub: 'Render spreadsheet ledgers into professional PDF reports',
+                    title: 'Excel / CSV to PDF',
+                    sub: 'Render spreadsheet financial tables into professional PDF',
                     onTap: () async {
                       Navigator.pop(ctx);
                       final res = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['xlsx', 'csv']);
@@ -318,7 +341,7 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
                           pdf.addPage(
                             pw.MultiPage(
                               build: (_) => [
-                                pw.Header(level: 0, text: 'Spreadsheet: $table'),
+                                pw.Header(level: 0, text: 'Spreadsheet Report: $table'),
                                 pw.Table.fromTextArray(
                                   data: sheet.rows.map((row) => row.map((cell) => cell?.value?.toString() ?? '').toList()).toList(),
                                 ),
@@ -329,7 +352,7 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
                         final vaultDir = await _getAccountVaultDir();
                         await File(p.join(vaultDir.path, 'Spreadsheet_Report.pdf')).writeAsBytes(await pdf.save());
                         await _reloadVault();
-                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Excel Converted to PDF!')));
+                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Excel Converted to PDF Report!')));
                       }
                     },
                   ),
@@ -376,9 +399,6 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
     return Uint8List.fromList(ZipEncoder().encode(archive)!);
   }
 
-  // ===========================================================================
-  // MAIN UI BUILD
-  // ===========================================================================
   @override
   Widget build(BuildContext context) {
     if (!_isVaultUnlocked) {
@@ -402,7 +422,7 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
                       obscureText: true,
                       keyboardType: TextInputType.number,
                       maxLength: 4,
-                      decoration: const InputDecoration(labelText: 'Enter 4-Digit PIN', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(labelText: 'Enter 4-Digit Master PIN', border: OutlineInputBorder()),
                     ),
                     const SizedBox(height: 12),
                     SizedBox(
@@ -439,7 +459,7 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
         ),
         actions: [
           IconButton(
-            tooltip: 'Import External PDF/File',
+            tooltip: 'Import External File',
             icon: const Icon(Icons.file_upload_outlined),
             onPressed: _importExternalFile,
           ),
@@ -474,7 +494,6 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Executive Header Banner
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
@@ -539,7 +558,7 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
             ),
             _toolTile(
               icon: Icons.folder_zip_outlined,
-              title: 'Format Converter',
+              title: 'Format Converter Hub',
               sub: 'PDF ⇄ Image ⇄ Word ⇄ Excel',
               color: const Color(0xFFB45309),
               onTap: _openConverterHub,
@@ -639,15 +658,10 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
       child: ListTile(
         onTap: () async {
           if (file.ext == 'PDF') {
-            final bytes = await File(file.path).readAsBytes();
-            if (!mounted) return;
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => Scaffold(
-                  appBar: AppBar(title: Text(file.name)),
-                  body: PdfPreview(build: (_) async => bytes),
-                ),
+                builder: (_) => PdfEditorStudio(filePath: file.path, fileName: file.name),
               ),
             );
           } else {
@@ -750,7 +764,7 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
           child: ListTile(
             leading: const CircleAvatar(backgroundColor: Color(0xFF0F172A), foregroundColor: Color(0xFFD4AF37), child: Text('AN')),
             title: Text(_currentAccount, style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: const Text('Workspace Profile'),
+            subtitle: const Text('Active Executive Workspace'),
           ),
         ),
         Card(
@@ -875,6 +889,105 @@ class _ScanPreviewStudioState extends State<ScanPreviewStudio> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class PdfEditorStudio extends StatefulWidget {
+  final String filePath;
+  final String fileName;
+
+  const PdfEditorStudio({super.key, required this.filePath, required this.fileName});
+
+  @override
+  State<PdfEditorStudio> createState() => _PdfEditorStudioState();
+}
+
+class _PdfEditorStudioState extends State<PdfEditorStudio> {
+  List<Uint8List> _pageImages = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPdfPages();
+  }
+
+  Future<void> _loadPdfPages() async {
+    setState(() => _loading = true);
+    final bytes = await File(widget.filePath).readAsBytes();
+    final List<Uint8List> imgs = [];
+    await for (final page in Printing.raster(bytes, dpi: 150)) {
+      imgs.add(await page.toPng());
+    }
+    setState(() {
+      _pageImages = imgs;
+      _loading = false;
+    });
+  }
+
+  Future<void> _saveChanges() async {
+    final pdf = pw.Document();
+    for (final img in _pageImages) {
+      pdf.addPage(pw.Page(build: (_) => pw.Center(child: pw.Image(pw.MemoryImage(img)))));
+    }
+    await File(widget.filePath).writeAsBytes(await pdf.save());
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('PDF updated successfully!')));
+      Navigator.pop(context);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.fileName, maxLines: 1),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.save),
+            tooltip: 'Save Changes',
+            onPressed: _loading ? null : _saveChanges,
+          ),
+        ],
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _pageImages.isEmpty
+              ? const Center(child: Text('No pages found.'))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(12),
+                  itemCount: _pageImages.length,
+                  itemBuilder: (_, i) => Card(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.between,
+                            children: [
+                              Text('Page ${i + 1}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                              Row(
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                    onPressed: () {
+                                      setState(() => _pageImages.removeAt(i));
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          const Divider(),
+                          Image.memory(_pageImages[i]),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
     );
   }
 }
