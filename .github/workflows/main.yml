@@ -20,12 +20,12 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Set up Flutter
+      - name: Set up Flutter (3.27.4 supports Color.toARGB32 & SDK 35)
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.3'
+          flutter-version: '3.27.4'
           channel: 'stable'
-          cache: true
+          cache: false
 
       - name: Generate Clean Android Project Scaffold
         run: |
