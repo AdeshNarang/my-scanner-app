@@ -1,7 +1,7 @@
 name: an_scan
 description: AN Scan - Executive Document & Format Conversion Studio by Adesh Narang.
 publish_to: 'none'
-version: 5.0.0+10
+version: 6.0.0+12
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -10,22 +10,13 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # Offline AI Text & Document OCR
   google_mlkit_text_recognition: ^0.13.0
-
-  # PDF Engine, Viewer & Wireless Printing
   pdf: ^3.11.1
   printing: ^5.13.2
-
-  # Camera, Gallery & Image Compression
   image_picker: ^1.1.2
   flutter_image_compress: ^2.3.0
-
-  # Office Document Engines (Excel .xlsx & Word .docx / Zip)
   excel: ^4.0.3
   archive: ^3.4.10
-
-  # Storage, Sharing, System Intents & Utilities
   path_provider: ^2.1.4
   path: ^1.9.0
   share_plus: ^10.0.2
@@ -34,6 +25,7 @@ dependencies:
   shared_preferences: ^2.3.2
   intl: ^0.19.0
   url_launcher: ^6.3.0
+  receive_sharing_intent: ^1.7.0
 
 dev_dependencies:
   flutter_test:
