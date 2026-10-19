@@ -71,8 +71,8 @@ jobs:
                   applicationId = "in.adeshnarang.an_scan"
                   minSdk = 24
                   targetSdk = 35
-                  versionCode = 10
-                  versionName = "5.0.0"
+                  versionCode = 12
+                  versionName = "6.0.0"
                   multiDexEnabled = true
               }
 
@@ -91,7 +91,7 @@ jobs:
           }
           EOF
 
-      - name: Configure AndroidManifest.xml (Intents, File Viewer & Share Receiver)
+      - name: Configure AndroidManifest.xml (Intent Interceptor)
         run: |
           cat << 'EOF' > android/app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
@@ -127,7 +127,6 @@ jobs:
                           <category android:name="android.intent.category.LAUNCHER"/>
                       </intent-filter>
 
-                      <!-- Intent filter to intercept external PDFs/Files opened with AN Scan -->
                       <intent-filter>
                           <action android:name="android.intent.action.VIEW" />
                           <category android:name="android.intent.category.DEFAULT" />
@@ -152,9 +151,8 @@ jobs:
       - name: Process & Integrate Custom Logo into Android Mipmaps
         run: |
           sudo apt-get update -y && sudo apt-get install -y imagemagick
-          # Expects logo file placed in repository root as assets/logo.png
           if [ ! -f "assets/logo.png" ]; then
-            echo "Error: assets/logo.png not found! Please place your logo image in assets/logo.png"
+            echo "Error: assets/logo.png not found!"
             exit 1
           fi
           convert assets/logo.png -resize 48x48 android/app/src/main/res/mipmap-mdpi/ic_launcher.png
@@ -168,10 +166,10 @@ jobs:
           flutter clean
           flutter pub get
 
-      - name: Build Release APK (No R8 Shrink Crash)
+      - name: Build Release APK
         run: flutter build apk --release --no-shrink
 
-      - name: Upload AN Scan Release APK
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: AN-Scan-Release-APK
