@@ -43,10 +43,6 @@ void main() async {
   runApp(const ANOfficeExecutiveApp());
 }
 
-// =============================================================================
-// 1. STRICT NAVY, ROYAL BLUE & CRISP WHITE PALETTE (ZERO YELLOW / GOLD)
-// =============================================================================
-
 const Color kNavyPrimary = Color(0xFF0F172A);
 const Color kNavySecondary = Color(0xFF1E293B);
 const Color kBlueAccent = Color(0xFF2563EB);
@@ -92,7 +88,6 @@ class ANOfficeExecutiveApp extends StatelessWidget {
   }
 }
 
-/// Renders the new AN OFFICE Classical Filigree Crest Logo (`75050.png`)
 class ANOfficeLogoBadge extends StatelessWidget {
   final double size;
   const ANOfficeLogoBadge({super.key, this.size = 46});
@@ -179,10 +174,6 @@ class _ANOfficeCrestFallbackPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-// =============================================================================
-// 2. BACKGROUND ISOLATE IMAGE PROCESSOR (PREVENTS UI HANGS & CRASHES)
-// =============================================================================
-
 class _IsolateFilterPayload {
   final Uint8List bytes;
   final int filterIndex;
@@ -195,13 +186,10 @@ Uint8List _applyFilterInBackgroundIsolate(_IsolateFilterPayload payload) {
 
   img.Image working = decoded.clone();
   if (payload.filterIndex == 1) {
-    // Magic Color
     working = img.adjustColor(working, contrast: 1.30, saturation: 1.18, brightness: 1.04);
   } else if (payload.filterIndex == 2) {
-    // Grayscale
     working = img.grayscale(working);
   } else if (payload.filterIndex == 3) {
-    // High Contrast B&W
     working = img.grayscale(working);
     working = img.luminanceThreshold(working, threshold: 0.53);
   }
@@ -210,7 +198,7 @@ Uint8List _applyFilterInBackgroundIsolate(_IsolateFilterPayload payload) {
 
 class _IsolateWarpPayload {
   final Uint8List bytes;
-  final List<double> normCoords; // [x0,y0, x1,y1, x2,y2, x3,y3]
+  final List<double> normCoords;
   _IsolateWarpPayload(this.bytes, this.normCoords);
 }
 
@@ -244,10 +232,6 @@ Uint8List _performPerspectiveWarpInIsolate(_IsolateWarpPayload payload) {
   }
   return Uint8List.fromList(img.encodeJpg(dstImg, quality: 92));
 }
-
-// =============================================================================
-// 3. DATA MODELS FOR VAULT, PAGES, OCR, CUSTOM TEXT & EYEDROPPER ERASER
-// =============================================================================
 
 class VaultFile {
   final String name;
@@ -313,9 +297,8 @@ class GlobalSearchMatch {
   });
 }
 
-/// Represents a freehand brush stroke painted with the Eyedropper-sampled background color
-BlemishEraserStroke {
-  final List<Offset> normalizedPoints; // 0.0 - 1.0
+class BlemishEraserStroke {
+  final List<Offset> normalizedPoints;
   final Color sampledColor;
   final double strokeWidth;
 
@@ -326,9 +309,8 @@ BlemishEraserStroke {
   });
 }
 
-/// Represents floating custom text, stamps, or ink signatures placed on a page
 class PageAnnotationItem {
-  final String type; // 'text', 'stamp', 'signature', 'patch'
+  final String type;
   String text;
   Offset normalizedPos;
   Color color;
@@ -373,10 +355,6 @@ class EditableDocumentPage {
         eraserStrokes = eraserStrokes ?? [];
 }
 
-// =============================================================================
-// 4. MULTILINGUAL OCR (ENGLISH, HINDI, PUNJABI) & 8-WAY FORMAT ENGINE
-// =============================================================================
-
 enum OcrLanguageMode { english, hindiDevanagari, punjabiGurmukhi }
 
 extension OcrLanguageLabel on OcrLanguageMode {
@@ -394,7 +372,6 @@ extension OcrLanguageLabel on OcrLanguageMode {
 
 class UniversalFormatConverterEngine {
   static TextRecognizer createRecognizer(OcrLanguageMode mode) {
-    // Note: Android native dependency includes Devanagari & Latin; we dynamically instantiate
     return TextRecognizer(script: TextRecognitionScript.latin);
   }
 
@@ -473,11 +450,7 @@ class UniversalFormatConverterEngine {
   static List<List<String>> extractRowsFromExcelOrCsv(Uint8List bytes, String ext) {
     if (ext.toUpperCase() == 'CSV') {
       final content = utf8.decode(bytes, allowMalformed: true);
-      final rows = content
-          .split('\n')
-          .where((l) => l.trim().isNotEmpty)
-          .map((l) => l.split(',').map((c) => c.trim()).toList())
-          .toList();
+      final rows = content.split('\n').where((l) => l.trim().isNotEmpty).map((l) => l.split(',').map((c) => c.trim()).toList()).toList();
       return rows.isEmpty ? [['', '', '']] : rows;
     }
     try {
@@ -489,17 +462,9 @@ class UniversalFormatConverterEngine {
           rows.add(row.map((cell) => cell?.value?.toString() ?? '').toList());
         }
       }
-      return rows.isEmpty
-          ? [
-              ['Item', 'Description', 'Amount'],
-              ['1', '', '0.00']
-            ]
-          : rows;
+      return rows.isEmpty ? [['Item', 'Description', 'Amount'], ['1', '', '0.00']] : rows;
     } catch (_) {
-      return [
-        ['Column A', 'Column B', 'Column C'],
-        ['', '', '']
-      ];
+      return [['Column A', 'Column B', 'Column C'], ['', '', '']];
     }
   }
 
@@ -543,10 +508,6 @@ class UniversalFormatConverterEngine {
   }
 }
 
-// =============================================================================
-// 5. AN OFFICE MASTER SHELL (CLEAN MODERN HEADER, ZERO YELLOW, GOOGLE DRIVE)
-// =============================================================================
-
 class ANOfficeMasterShell extends StatefulWidget {
   const ANOfficeMasterShell({super.key});
 
@@ -570,7 +531,6 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
   int _defaultCompression = 80;
   OcrLanguageMode _defaultOcrLang = OcrLanguageMode.english;
 
-  // Google Drive Cloud Sync State
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: ['email', 'https://www.googleapis.com/auth/drive.readonly'],
   );
@@ -626,15 +586,13 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
       modified: DateTime.now(),
       sizeBytes: await File(destPath).length(),
     );
-    // Opens immediately in True PDF Reader Mode or Native-Like Office Viewer!
     _openVaultFile(vf);
   }
 
   Future<void> _initWorkspace() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _accounts = prefs.getStringList('user_accounts') ??
-          ['Adesh Narang (Admin)', 'Head Office Desk', 'Personal Vault'];
+      _accounts = prefs.getStringList('user_accounts') ?? ['Adesh Narang (Admin)', 'Head Office Desk', 'Personal Vault'];
       _currentAccount = prefs.getString('active_account') ?? _accounts.first;
       _masterPin = prefs.getString('master_pin');
       _defaultCompression = prefs.getInt('default_compression') ?? 80;
@@ -682,15 +640,11 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
     if (mounted) setState(() => _vaultFiles = loaded);
   }
 
-  // ===========================================================================
-  // 100% ACCURATE GOOGLE ML KIT AI DOCUMENT EDGE SCANNER
-  // (Supports both Camera & Gallery Import with Automatic Edge Detection!)
-  // ===========================================================================
   Future<void> _launchGoogleAiDocumentScanner({bool galleryImport = true}) async {
     try {
       final options = DocumentScannerOptions(
         documentFormat: DocumentFormat.jpeg,
-        mode: ScannerMode.full, // Enables auto edge detection, perspective warp & magic filters
+        mode: ScannerMode.full,
         pageLimit: 50,
         isGalleryImport: galleryImport,
       );
@@ -733,12 +687,10 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
         return;
       }
     } catch (_) {
-      // Fallback if device lacks Play Services or user picks manual gallery crop
       await _fallbackManualScanWithCrop(fromGallery: galleryImport);
     }
   }
 
-  /// Fallback manual camera/gallery import that ALWAYS opens the 4-Corner Crop Studio for EVERY picture
   Future<void> _fallbackManualScanWithCrop({required bool fromGallery}) async {
     final picker = ImagePicker();
     final List<String> rawPaths = [];
@@ -798,9 +750,6 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
     );
   }
 
-  // ===========================================================================
-  // FILE OPENER: TRUE PDF READER FIRST, NATIVE WORD VIEWER, NATIVE EXCEL GRID
-  // ===========================================================================
   Future<void> _openVaultFile(VaultFile file) async {
     if (file.isLocked) {
       final unlocked = await _promptPinVerification();
@@ -809,7 +758,6 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
     if (!mounted) return;
 
     if (file.ext == 'PDF') {
-      // Opens FIRST in Google Drive-style True PDF Reader Mode (Scroll + Pinch-to-Zoom + Search + Edit button)
       await Navigator.push(
         context,
         MaterialPageRoute(
@@ -823,7 +771,6 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
         ),
       );
     } else if (file.ext == 'XLSX' || file.ext == 'CSV') {
-      // Opens in Native-Style Interactive MS Excel Spreadsheet Grid!
       await Navigator.push(
         context,
         MaterialPageRoute(
@@ -836,7 +783,6 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
         ),
       );
     } else if (file.ext == 'DOCX' || file.ext == 'TXT') {
-      // Opens in Native-Style MS Word Print-Layout A4 Document Viewer & Editor!
       await Navigator.push(
         context,
         MaterialPageRoute(
@@ -910,9 +856,6 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
     }
   }
 
-  // ===========================================================================
-  // DEDICATED HOME SCREEN PDF & IMAGE COMPRESSOR WITH LIVE SIZE ESTIMATOR
-  // ===========================================================================
   Future<void> _openDedicatedCompressionStudio() async {
     final picked = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -944,9 +887,6 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
     );
   }
 
-  // ===========================================================================
-  // GOOGLE DRIVE CLOUD SYNC METHODS
-  // ===========================================================================
   Future<void> _handleGoogleSignIn() async {
     try {
       setState(() => _loadingDrive = true);
@@ -957,10 +897,7 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Google Sign-In requires OAuth SHA-1 fingerprint in Cloud Console ($e)'),
-            backgroundColor: kNavyPrimary,
-          ),
+          SnackBar(content: Text('Google Sign-In requires OAuth SHA-1 fingerprint ($e)'), backgroundColor: kNavyPrimary),
         );
       }
     } finally {
@@ -1009,7 +946,7 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
         await _reloadVault();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Synced "$safeName" from Google Drive to Vault!'), backgroundColor: kBlueAccent),
+            SnackBar(content: Text('Synced "$safeName" from Google Drive!'), backgroundColor: kBlueAccent),
           );
         }
       }
@@ -1045,9 +982,6 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
     return res ?? false;
   }
 
-  // ===========================================================================
-  // UNIVERSAL 8-WAY FORMAT CONVERTER HUB (OPENS CONVERTED FILES IN NATIVE VIEWER)
-  // ===========================================================================
   void _openUniversalConverterHub() {
     showModalBottomSheet(
       context: context,
@@ -1077,15 +1011,9 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
                 const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Universal Format Converter Hub',
-                      style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: kNavyPrimary),
-                    ),
+                    Text('Universal Format Converter Hub', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: kNavyPrimary)),
                     SizedBox(height: 2),
-                    Text(
-                      'Convert & open directly in AN Office Word, Excel & PDF Studio',
-                      style: TextStyle(fontSize: 12.5, color: kSlateMuted),
-                    ),
+                    Text('Convert & open directly in AN Office Word, Excel & PDF Studio', style: TextStyle(fontSize: 12.5, color: kSlateMuted)),
                   ],
                 ),
                 IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close)),
@@ -1278,9 +1206,8 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
       }
 
       await _reloadVault();
-      if (mounted) Navigator.pop(context); // Dismiss progress dialog
+      if (mounted) Navigator.pop(context);
 
-      // Immediately open the newly converted file in its proper Native-Style Viewer!
       if (createdFilePath != null && mounted) {
         final stat = await File(createdFilePath).stat();
         _openVaultFile(
@@ -1395,9 +1322,6 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
     return '${(bytes / (1024 * 1024)).toStringAsFixed(2)} MB';
   }
 
-  // ===========================================================================
-  // MAIN SHELL BUILD (CLEAN EXECUTIVE HEADER & BACK-BUTTON NAVIGATION)
-  // ===========================================================================
   @override
   Widget build(BuildContext context) {
     if (!_isVaultUnlocked) {
@@ -1474,36 +1398,17 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
                   children: [
                     Row(
                       children: [
-                        const Text(
-                          'AN Office',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.5,
-                            fontSize: 20,
-                            color: kWhitePure,
-                          ),
-                        ),
+                        const Text('AN Office', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5, fontSize: 20, color: kWhitePure)),
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: kBlueAccent,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Text(
-                            'PRO',
-                            style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900, color: kWhitePure, letterSpacing: 0.6),
-                          ),
+                          decoration: BoxDecoration(color: kBlueAccent, borderRadius: BorderRadius.circular(6)),
+                          child: const Text('PRO', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900, color: kWhitePure, letterSpacing: 0.6)),
                         ),
                       ],
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      '$_currentAccount • adeshnarang.in',
-                      style: const TextStyle(fontSize: 11.5, color: kBlueLight, fontWeight: FontWeight.w500),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    Text('$_currentAccount • adeshnarang.in', style: const TextStyle(fontSize: 11.5, color: kBlueLight, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
                   ],
                 ),
               ),
@@ -1536,30 +1441,15 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
           selectedIndex: _tabIndex,
           onDestinationSelected: (i) => setState(() => _tabIndex = i),
           destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.dashboard_customize_outlined),
-              selectedIcon: Icon(Icons.dashboard_customize, color: kBlueAccent),
-              label: 'Office Studio',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.folder_special_outlined),
-              selectedIcon: Icon(Icons.folder_special, color: kBlueAccent),
-              label: 'File Vault',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.cloud_sync_outlined),
-              selectedIcon: Icon(Icons.cloud_sync, color: kBlueAccent),
-              label: 'Drive & Accounts',
-            ),
+            NavigationDestination(icon: Icon(Icons.dashboard_customize_outlined), selectedIcon: Icon(Icons.dashboard_customize, color: kBlueAccent), label: 'Office Studio'),
+            NavigationDestination(icon: Icon(Icons.folder_special_outlined), selectedIcon: Icon(Icons.folder_special, color: kBlueAccent), label: 'File Vault'),
+            NavigationDestination(icon: Icon(Icons.cloud_sync_outlined), selectedIcon: Icon(Icons.cloud_sync, color: kBlueAccent), label: 'Drive & Accounts'),
           ],
         ),
       ),
     );
   }
 
-  // ===========================================================================
-  // TAB 1: AN OFFICE STUDIO DASHBOARD (NAVY, ROYAL BLUE & CRISP WHITE)
-  // ===========================================================================
   Widget _buildExecutiveStudioDashboard() {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 36),
@@ -1567,19 +1457,9 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [kNavyPrimary, Color(0xFF1E3A8A)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            gradient: const LinearGradient(colors: [kNavyPrimary, Color(0xFF1E3A8A)], begin: Alignment.topLeft, end: Alignment.bottomRight),
             borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: kBlueAccent.withOpacity(0.18),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
-              ),
-            ],
+            boxShadow: [BoxShadow(color: kBlueAccent.withOpacity(0.18), blurRadius: 16, offset: const Offset(0, 6))],
           ),
           child: Column(
             children: [
@@ -1591,15 +1471,9 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'AN Office Workstation',
-                          style: TextStyle(color: kWhitePure, fontWeight: FontWeight.w900, fontSize: 17, letterSpacing: 0.3),
-                        ),
+                        const Text('AN Office Workstation', style: TextStyle(color: kWhitePure, fontWeight: FontWeight.w900, fontSize: 17, letterSpacing: 0.3)),
                         const SizedBox(height: 4),
-                        Text(
-                          '${_vaultFiles.length} Documents • AI Edge Scan • PDF, Word & Excel',
-                          style: const TextStyle(color: kBlueLight, fontSize: 12),
-                        ),
+                        Text('${_vaultFiles.length} Documents • AI Edge Scan • PDF, Word & Excel', style: const TextStyle(color: kBlueLight, fontSize: 12)),
                       ],
                     ),
                   ),
@@ -1618,10 +1492,7 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
                       ),
                       onPressed: () => _launchGoogleAiDocumentScanner(galleryImport: true),
                       icon: const Icon(Icons.document_scanner, color: kBlueAccent, size: 20),
-                      label: const Text(
-                        'AI Auto-Edge Scan',
-                        style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5),
-                      ),
+                      label: const Text('AI Auto-Edge Scan', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5)),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -1642,10 +1513,7 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
           ),
         ),
         const SizedBox(height: 20),
-        const Text(
-          'DOCUMENT SCANNER, READER, COMPRESSOR & OFFICE TOOLS',
-          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900, letterSpacing: 0.7, color: kSlateMuted),
-        ),
+        const Text('DOCUMENT SCANNER, READER, COMPRESSOR & OFFICE TOOLS', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900, letterSpacing: 0.7, color: kSlateMuted)),
         const SizedBox(height: 10),
         GridView.count(
           crossAxisCount: 2,
@@ -1655,27 +1523,9 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
           crossAxisSpacing: 12,
           childAspectRatio: 1.40,
           children: [
-            _buildStudioToolTile(
-              icon: Icons.compress_rounded,
-              title: 'Compress PDF / Img',
-              sub: 'Slider + Live Size Comparison',
-              accent: kBlueAccent,
-              onTap: _openDedicatedCompressionStudio,
-            ),
-            _buildStudioToolTile(
-              icon: Icons.hub_outlined,
-              title: 'Format Converter Hub',
-              sub: 'PDF ⇄ Word ⇄ Excel ⇄ Image',
-              accent: const Color(0xFF0284C7),
-              onTap: _openUniversalConverterHub,
-            ),
-            _buildStudioToolTile(
-              icon: Icons.crop_free_rounded,
-              title: 'Gallery Import & Crop',
-              sub: 'Auto-Edge or Manual 4-Corner',
-              accent: kNavyPrimary,
-              onTap: () => _fallbackManualScanWithCrop(fromGallery: true),
-            ),
+            _buildStudioToolTile(icon: Icons.compress_rounded, title: 'Compress PDF / Img', sub: 'Slider + Live Size Comparison', accent: kBlueAccent, onTap: _openDedicatedCompressionStudio),
+            _buildStudioToolTile(icon: Icons.hub_outlined, title: 'Format Converter Hub', sub: 'PDF ⇄ Word ⇄ Excel ⇄ Image', accent: const Color(0xFF0284C7), onTap: _openUniversalConverterHub),
+            _buildStudioToolTile(icon: Icons.crop_free_rounded, title: 'Gallery Import & Crop', sub: 'Auto-Edge or Manual 4-Corner', accent: kNavyPrimary, onTap: () => _fallbackManualScanWithCrop(fromGallery: true)),
             _buildStudioToolTile(
               icon: Icons.manage_search_rounded,
               title: 'Search & OCR Picture',
@@ -1700,35 +1550,16 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
                 }
               },
             ),
-            _buildStudioToolTile(
-              icon: Icons.picture_as_pdf_outlined,
-              title: 'PDF Reader & Editor',
-              sub: 'Read, Search, Add/Remove Page',
-              accent: const Color(0xFFDC2626),
-              onTap: _importExternalFilePicker,
-            ),
-            _buildStudioToolTile(
-              icon: Icons.call_merge_rounded,
-              title: 'Merge Multiple PDFs',
-              sub: 'Combine PDFs into Single File',
-              accent: const Color(0xFF4F46E5),
-              onTap: _openPdfMergerDialog,
-            ),
+            _buildStudioToolTile(icon: Icons.picture_as_pdf_outlined, title: 'PDF Reader & Editor', sub: 'Read, Search, Add/Remove Page', accent: const Color(0xFFDC2626), onTap: _importExternalFilePicker),
+            _buildStudioToolTile(icon: Icons.call_merge_rounded, title: 'Merge Multiple PDFs', sub: 'Combine PDFs into Single File', accent: const Color(0xFF4F46E5), onTap: _openPdfMergerDialog),
           ],
         ),
         const SizedBox(height: 22),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              'RECENT VAULT DOCUMENTS',
-              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900, letterSpacing: 0.7, color: kSlateMuted),
-            ),
-            TextButton.icon(
-              onPressed: () => setState(() => _tabIndex = 1),
-              icon: const Icon(Icons.arrow_forward, size: 16),
-              label: const Text('All Files'),
-            ),
+            const Text('RECENT VAULT DOCUMENTS', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900, letterSpacing: 0.7, color: kSlateMuted)),
+            TextButton.icon(onPressed: () => setState(() => _tabIndex = 1), icon: const Icon(Icons.arrow_forward, size: 16), label: const Text('All Files')),
           ],
         ),
         if (_vaultFiles.isEmpty)
@@ -1741,11 +1572,7 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
                   const SizedBox(height: 10),
                   const Text('Your AN Office Vault is Ready', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                   const SizedBox(height: 4),
-                  const Text(
-                    'Tap "AI Auto-Edge Scan", open a PDF/Word/Excel file from WhatsApp or Gmail, or sync Google Drive.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 12, color: kSlateMuted),
-                  ),
+                  const Text('Tap "AI Auto-Edge Scan", open a PDF/Word/Excel file from WhatsApp or Gmail, or sync Google Drive.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: kSlateMuted)),
                 ],
               ),
             ),
@@ -1756,13 +1583,7 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
     );
   }
 
-  Widget _buildStudioToolTile({
-    required IconData icon,
-    required String title,
-    required String sub,
-    required Color accent,
-    required VoidCallback onTap,
-  }) {
+  Widget _buildStudioToolTile({required IconData icon, required String title, required String sub, required Color accent, required VoidCallback onTap}) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -1790,9 +1611,6 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
     );
   }
 
-  // ===========================================================================
-  // TAB 2: FILE VAULT DIRECTORY
-  // ===========================================================================
   Widget _buildVaultDirectoryTab() {
     final filtered = _vaultFiles.where((f) {
       final matchesSearch = f.name.toLowerCase().contains(_searchQuery.toLowerCase());
@@ -1828,12 +1646,7 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
               final active = _selectedCategory == cat;
               return Padding(
                 padding: const EdgeInsets.only(right: 8),
-                child: ChoiceChip(
-                  label: Text(cat),
-                  selected: active,
-                  selectedColor: kBlueLight,
-                  onSelected: (_) => setState(() => _selectedCategory = cat),
-                ),
+                child: ChoiceChip(label: Text(cat), selected: active, selectedColor: kBlueLight, onSelected: (_) => setState(() => _selectedCategory = cat)),
               );
             }).toList(),
           ),
@@ -1930,14 +1743,10 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
     );
   }
 
-  // ===========================================================================
-  // TAB 3: GOOGLE DRIVE CLOUD SYNC, TRILINGUAL OCR & ACCOUNTS
-  // ===========================================================================
   Widget _buildAccountsAndDriveSyncTab() {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // GOOGLE DRIVE CLOUD SYNC CARD
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -1957,12 +1766,7 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text('Google Drive PDF Cloud Sync', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15.5, color: kNavyPrimary)),
-                          Text(
-                            _googleUser == null
-                                ? 'Sign in with Gmail to sync & download cloud PDFs'
-                                : 'Connected: ${_googleUser!.email}',
-                            style: const TextStyle(fontSize: 12, color: kSlateMuted),
-                          ),
+                          Text(_googleUser == null ? 'Sign in with Gmail to sync & download cloud PDFs' : 'Connected: ${_googleUser!.email}', style: const TextStyle(fontSize: 12, color: kSlateMuted)),
                         ],
                       ),
                     ),
@@ -2028,7 +1832,6 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
           ),
         ),
         const SizedBox(height: 12),
-        // TRILINGUAL OCR LANGUAGE SELECTOR
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -2131,13 +1934,6 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
   }
 }
 
-// =============================================================================
-// 6. TRUE PDF READER SCREEN (GOOGLE DRIVE STYLE)
-//    - Vertical continuous scrolling + Pinch-to-Zoom up to 5x
-//    - 100+ Page Global Word Search (Finds Page & Line + Highlights Word Box!)
-//    - Prominent "Edit PDF" button in toolbar to switch into Studio Editor
-// =============================================================================
-
 class TruePdfReaderScreen extends StatefulWidget {
   final String filePath;
   final String fileName;
@@ -2163,7 +1959,6 @@ class _TruePdfReaderScreenState extends State<TruePdfReaderScreen> {
   final ScrollController _scrollController = ScrollController();
   bool _loadingPages = true;
 
-  // Global Search State across all pages
   bool _showSearchBar = false;
   bool _indexingOcrSearch = false;
   final TextEditingController _searchCtrl = TextEditingController();
@@ -2203,7 +1998,6 @@ class _TruePdfReaderScreenState extends State<TruePdfReaderScreen> {
     }
   }
 
-  /// Scans all pages in the document to locate every occurrence of the search query
   Future<void> _runGlobalDocumentSearch(String query) async {
     final cleanQuery = query.trim().toLowerCase();
     if (cleanQuery.isEmpty) {
@@ -2235,7 +2029,6 @@ class _TruePdfReaderScreenState extends State<TruePdfReaderScreen> {
           }
         }
 
-        // Match words or lines on this page
         for (final wb in page.ocrWords) {
           if (wb.text.toLowerCase().contains(cleanQuery)) {
             found.add(
@@ -2352,8 +2145,7 @@ class _TruePdfReaderScreenState extends State<TruePdfReaderScreen> {
       ),
       body: Column(
         children: [
-          if (_indexingOcrSearch)
-            const LinearProgressIndicator(color: kBlueAccent),
+          if (_indexingOcrSearch) const LinearProgressIndicator(color: kBlueAccent),
           if (_showSearchBar && _searchMatches.isNotEmpty)
             Container(
               height: 54,
@@ -2369,10 +2161,7 @@ class _TruePdfReaderScreenState extends State<TruePdfReaderScreen> {
                     padding: const EdgeInsets.only(right: 8),
                     child: ActionChip(
                       backgroundColor: selected ? kBlueAccent : kNavyPrimary,
-                      label: Text(
-                        'Page ${m.pageIndex + 1}: "${m.matchedLine}"',
-                        style: const TextStyle(color: kWhitePure, fontSize: 12),
-                      ),
+                      label: Text('Page ${m.pageIndex + 1}: "${m.matchedLine}"', style: const TextStyle(color: kWhitePure, fontSize: 12)),
                       onPressed: () => _jumpToSearchMatch(m),
                     ),
                   );
@@ -2426,7 +2215,7 @@ class _TruePdfReaderScreenState extends State<TruePdfReaderScreen> {
                                           ),
                                         );
                                       },
-                                      icon: const Icon(Icons.text_Fields, size: 14, color: kBlueAccent),
+                                      icon: const Icon(Icons.text_fields, size: 14, color: kBlueAccent),
                                       label: const Text('Select Text', style: TextStyle(fontSize: 11.5, color: kBlueAccent)),
                                     ),
                                   ],
@@ -2476,11 +2265,6 @@ class _TruePdfReaderScreenState extends State<TruePdfReaderScreen> {
   }
 }
 
-// =============================================================================
-// 7. NATIVE-STYLE MICROSOFT EXCEL SPREADSHEET STUDIO (.XLSX / .CSV)
-//    (Real 2D Grid with Sticky Column Letters A, B, C, Row Numbers & Cell Edit)
-// =============================================================================
-
 class NativeExcelSpreadsheetStudio extends StatefulWidget {
   final String filePath;
   final String fileName;
@@ -2522,9 +2306,7 @@ class _NativeExcelSpreadsheetStudioState extends State<NativeExcelSpreadsheetStu
     }
     final normalized = extracted.map((r) {
       final copy = List<String>.from(r);
-      while (copy.length < maxCols) {
-        copy.add('');
-      }
+      while (copy.length < maxCols) copy.add('');
       return copy;
     }).toList();
     while (normalized.length < 20) {
@@ -2564,7 +2346,7 @@ class _NativeExcelSpreadsheetStudioState extends State<NativeExcelSpreadsheetStu
     return Scaffold(
       backgroundColor: kWhitePure,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF15803D), // Classic Excel Green Header
+        backgroundColor: const Color(0xFF15803D),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -2576,22 +2358,14 @@ class _NativeExcelSpreadsheetStudioState extends State<NativeExcelSpreadsheetStu
           IconButton(
             tooltip: 'Add Row',
             icon: const Icon(Icons.playlist_add),
-            onPressed: () {
-              setState(() {
-                _grid.add(List.filled(_grid.first.length, ''));
-              });
-            },
+            onPressed: () => setState(() => _grid.add(List.filled(_grid.first.length, ''))),
           ),
           IconButton(
             tooltip: 'Add Column',
             icon: const Icon(Icons.view_column_outlined),
-            onPressed: () {
-              setState(() {
-                for (final r in _grid) {
-                  r.add('');
-                }
-              });
-            },
+            onPressed: () => setState(() {
+              for (final r in _grid) r.add('');
+            }),
           ),
           IconButton(
             tooltip: 'Save .XLSX',
@@ -2609,7 +2383,6 @@ class _NativeExcelSpreadsheetStudioState extends State<NativeExcelSpreadsheetStu
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
-                // Excel Formula / Cell Editor Bar (`fx`)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   color: kBlueIceBg,
@@ -2617,15 +2390,8 @@ class _NativeExcelSpreadsheetStudioState extends State<NativeExcelSpreadsheetStu
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: kWhitePure,
-                          border: Border.all(color: Colors.grey.shade400),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '${_colLetter(_selectedCol)}${_selectedRow + 1}',
-                          style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF15803D)),
-                        ),
+                        decoration: BoxDecoration(color: kWhitePure, border: Border.all(color: Colors.grey.shade400), borderRadius: BorderRadius.circular(6)),
+                        child: Text('${_colLetter(_selectedCol)}${_selectedRow + 1}', style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF15803D))),
                       ),
                       const SizedBox(width: 10),
                       const Text('fx', style: TextStyle(fontStyle: FontStyle.italic, fontWeight: FontWeight.bold, color: kSlateMuted)),
@@ -2633,24 +2399,13 @@ class _NativeExcelSpreadsheetStudioState extends State<NativeExcelSpreadsheetStu
                       Expanded(
                         child: TextField(
                           controller: _formulaCtrl,
-                          decoration: const InputDecoration(
-                            isDense: true,
-                            hintText: 'Enter cell value...',
-                            filled: true,
-                            fillColor: kWhitePure,
-                            border: OutlineInputBorder(),
-                          ),
-                          onChanged: (val) {
-                            setState(() {
-                              _grid[_selectedRow][_selectedCol] = val;
-                            });
-                          },
+                          decoration: const InputDecoration(isDense: true, hintText: 'Enter cell value...', filled: true, fillColor: kWhitePure, border: OutlineInputBorder()),
+                          onChanged: (val) => setState(() => _grid[_selectedRow][_selectedCol] = val),
                         ),
                       ),
                     ],
                   ),
                 ),
-                // 2D Scrollable Spreadsheet Grid
                 Expanded(
                   child: InteractiveViewer(
                     constrained: false,
@@ -2659,34 +2414,20 @@ class _NativeExcelSpreadsheetStudioState extends State<NativeExcelSpreadsheetStu
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Header Row (A, B, C, D...)
                         Row(
                           children: [
-                            Container(
-                              width: 46,
-                              height: 34,
-                              alignment: Alignment.center,
-                              color: const Color(0xFFE2E8F0),
-                              child: const Icon(Icons.grid_4x4, size: 14, color: kSlateMuted),
-                            ),
+                            Container(width: 46, height: 34, alignment: Alignment.center, color: const Color(0xFFE2E8F0), child: const Icon(Icons.grid_4x4, size: 14, color: kSlateMuted)),
                             ...List.generate(_grid.first.length, (c) {
                               return Container(
                                 width: 125,
                                 height: 34,
                                 alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                  color: c == _selectedCol ? const Color(0xFFDCFCE7) : const Color(0xFFE2E8F0),
-                                  border: Border.all(color: Colors.grey.shade400, width: 0.5),
-                                ),
-                                child: Text(
-                                  _colLetter(c),
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: kNavyPrimary),
-                                ),
+                                decoration: BoxDecoration(color: c == _selectedCol ? const Color(0xFFDCFCE7) : const Color(0xFFE2E8F0), border: Border.all(color: Colors.grey.shade400, width: 0.5)),
+                                child: Text(_colLetter(c), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: kNavyPrimary)),
                               );
                             }),
                           ],
                         ),
-                        // Data Rows
                         ...List.generate(_grid.length, (r) {
                           return Row(
                             children: [
@@ -2694,22 +2435,17 @@ class _NativeExcelSpreadsheetStudioState extends State<NativeExcelSpreadsheetStu
                                 width: 46,
                                 height: 36,
                                 alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                  color: r == _selectedRow ? const Color(0xFFDCFCE7) : const Color(0xFFE2E8F0),
-                                  border: Border.all(color: Colors.grey.shade400, width: 0.5),
-                                ),
+                                decoration: BoxDecoration(color: r == _selectedRow ? const Color(0xFFDCFCE7) : const Color(0xFFE2E8F0), border: Border.all(color: Colors.grey.shade400, width: 0.5)),
                                 child: Text('${r + 1}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: kSlateMuted)),
                               ),
                               ...List.generate(_grid[r].length, (c) {
                                 final isSel = r == _selectedRow && c == _selectedCol;
                                 return GestureDetector(
-                                  onTap: () {
-                                    setState(() {
-                                      _selectedRow = r;
-                                      _selectedCol = c;
-                                      _formulaCtrl.text = _grid[r][c];
-                                    });
-                                  },
+                                  onTap: () => setState(() {
+                                    _selectedRow = r;
+                                    _selectedCol = c;
+                                    _formulaCtrl.text = _grid[r][c];
+                                  }),
                                   child: Container(
                                     width: 125,
                                     height: 36,
@@ -2717,20 +2453,9 @@ class _NativeExcelSpreadsheetStudioState extends State<NativeExcelSpreadsheetStu
                                     alignment: Alignment.centerLeft,
                                     decoration: BoxDecoration(
                                       color: isSel ? const Color(0xFFF0FDF4) : kWhitePure,
-                                      border: Border.all(
-                                        color: isSel ? const Color(0xFF15803D) : Colors.grey.shade300,
-                                        width: isSel ? 2.0 : 0.5,
-                                      ),
+                                      border: Border.all(color: isSel ? const Color(0xFF15803D) : Colors.grey.shade300, width: isSel ? 2.0 : 0.5),
                                     ),
-                                    child: Text(
-                                      _grid[r][c],
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 12.5,
-                                        fontWeight: r == 0 ? FontWeight.bold : FontWeight.normal,
-                                      ),
-                                    ),
+                                    child: Text(_grid[r][c], maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12.5, fontWeight: r == 0 ? FontWeight.bold : FontWeight.normal)),
                                   ),
                                 );
                               }),
@@ -2746,11 +2471,6 @@ class _NativeExcelSpreadsheetStudioState extends State<NativeExcelSpreadsheetStu
     );
   }
 }
-
-// =============================================================================
-// 8. NATIVE-STYLE MICROSOFT WORD PRINT-LAYOUT STUDIO (.DOCX)
-//    (Renders an actual A4 White Paper Page Canvas with Zoom & Rich Editing)
-// =============================================================================
 
 class NativeWordDocumentStudio extends StatefulWidget {
   final String filePath;
@@ -2794,10 +2514,7 @@ class _NativeWordDocumentStudioState extends State<NativeWordDocumentStudio> {
 
   Future<void> _saveWordDoc() async {
     final paragraphs = _docCtrl.text.split('\n');
-    final docxBytes = UniversalFormatConverterEngine.buildDocxBytes(
-      title: '',
-      paragraphs: paragraphs,
-    );
+    final docxBytes = UniversalFormatConverterEngine.buildDocxBytes(title: '', paragraphs: paragraphs);
     await File(widget.filePath).writeAsBytes(docxBytes);
     widget.onSaved();
     if (mounted) {
@@ -2810,9 +2527,9 @@ class _NativeWordDocumentStudioState extends State<NativeWordDocumentStudio> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFCBD5E1), // MS Word Slate Desk Backdrop
+      backgroundColor: const Color(0xFFCBD5E1),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1D4ED8), // Classic MS Word Royal Blue
+        backgroundColor: const Color(0xFF1D4ED8),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -2842,7 +2559,6 @@ class _NativeWordDocumentStudioState extends State<NativeWordDocumentStudio> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
-                // Formatting Ribbon
                 Container(
                   color: kWhitePure,
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
@@ -2866,7 +2582,6 @@ class _NativeWordDocumentStudioState extends State<NativeWordDocumentStudio> {
                     ],
                   ),
                 ),
-                // A4 White Paper Sheet Print-Layout with Pinch-to-Zoom
                 Expanded(
                   child: InteractiveViewer(
                     minScale: 0.8,
@@ -2880,30 +2595,18 @@ class _NativeWordDocumentStudioState extends State<NativeWordDocumentStudio> {
                           decoration: BoxDecoration(
                             color: kWhitePure,
                             borderRadius: BorderRadius.circular(4),
-                            boxShadow: const [
-                              BoxShadow(color: Colors.black26, blurRadius: 14, offset: Offset(0, 4)),
-                            ],
+                            boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 14, offset: Offset(0, 4))],
                           ),
                           child: _editMode
                               ? TextField(
                                   controller: _docCtrl,
                                   maxLines: null,
-                                  style: TextStyle(
-                                    fontSize: _fontSize,
-                                    fontWeight: _isBold ? FontWeight.bold : FontWeight.normal,
-                                    height: 1.6,
-                                    color: kNavyPrimary,
-                                  ),
+                                  style: TextStyle(fontSize: _fontSize, fontWeight: _isBold ? FontWeight.bold : FontWeight.normal, height: 1.6, color: kNavyPrimary),
                                   decoration: const InputDecoration(border: InputBorder.none),
                                 )
                               : SelectableText(
                                   _docCtrl.text,
-                                  style: TextStyle(
-                                    fontSize: _fontSize,
-                                    fontWeight: _isBold ? FontWeight.bold : FontWeight.normal,
-                                    height: 1.6,
-                                    color: kNavyPrimary,
-                                  ),
+                                  style: TextStyle(fontSize: _fontSize, fontWeight: _isBold ? FontWeight.bold : FontWeight.normal, height: 1.6, color: kNavyPrimary),
                                 ),
                         ),
                       ),
@@ -2915,10 +2618,6 @@ class _NativeWordDocumentStudioState extends State<NativeWordDocumentStudio> {
     );
   }
 }
-
-// =============================================================================
-// 9. DEDICATED PDF & IMAGE COMPRESSOR WITH REAL-TIME SIZE COMPARISON
-// =============================================================================
 
 class LivePdfImageCompressionScreen extends StatefulWidget {
   final Uint8List originalBytes;
@@ -2961,10 +2660,7 @@ class _LivePdfImageCompressionScreenState extends State<LivePdfImageCompressionS
 
     try {
       if (!widget.isPdf) {
-        final comp = await FlutterImageCompress.compressWithList(
-          widget.originalBytes,
-          quality: q,
-        );
+        final comp = await FlutterImageCompress.compressWithList(widget.originalBytes, quality: q);
         if (mounted) setState(() => _previewCompressedBytes = comp);
       } else {
         final outPdf = pw.Document();
@@ -3035,10 +2731,7 @@ class _LivePdfImageCompressionScreenState extends State<LivePdfImageCompressionS
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                       decoration: BoxDecoration(color: kBlueLight, borderRadius: BorderRadius.circular(20)),
-                      child: Text(
-                        'Space Saved: ${savedPercent.toStringAsFixed(1)}%',
-                        style: const TextStyle(fontWeight: FontWeight.w900, color: kBlueAccent, fontSize: 13),
-                      ),
+                      child: Text('Space Saved: ${savedPercent.toStringAsFixed(1)}%', style: const TextStyle(fontWeight: FontWeight.w900, color: kBlueAccent, fontSize: 13)),
                     ),
                   ],
                 ),
@@ -3068,10 +2761,7 @@ class _LivePdfImageCompressionScreenState extends State<LivePdfImageCompressionS
                       onChanged: (v) => setState(() => _qualitySlider = v),
                       onChangeEnd: (_) => _recalculateCompressedSize(),
                     ),
-                    const Text(
-                      'Lower percentage produces a smaller file size. Move the slider to preview exact output size.',
-                      style: TextStyle(fontSize: 12, color: kSlateMuted),
-                    ),
+                    const Text('Lower percentage produces a smaller file size. Move the slider to preview exact output size.', style: TextStyle(fontSize: 12, color: kSlateMuted)),
                   ],
                 ),
               ),
@@ -3080,19 +2770,14 @@ class _LivePdfImageCompressionScreenState extends State<LivePdfImageCompressionS
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: kBlueAccent,
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                ),
+                style: FilledButton.styleFrom(backgroundColor: kBlueAccent, padding: const EdgeInsets.symmetric(vertical: 15)),
                 onPressed: _calculating || _previewCompressedBytes == null
                     ? null
                     : () async {
                         final outName = 'Compressed_${widget.fileName}';
                         await widget.onSaveCompressed(_previewCompressedBytes!, outName);
                         if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Saved $outName (${_fmtSize(compLen)}) to Vault!'), backgroundColor: const Color(0xFF15803D)),
-                          );
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Saved $outName (${_fmtSize(compLen)}) to Vault!'), backgroundColor: const Color(0xFF15803D)));
                           Navigator.pop(context);
                         }
                       },
@@ -3106,15 +2791,6 @@ class _LivePdfImageCompressionScreenState extends State<LivePdfImageCompressionS
     );
   }
 }
-
-// =============================================================================
-// 10. COMPLETE ACROBAT & PAGE EDITING STUDIO
-//     - Pinch-to-Zoom on Every Page
-//     - Add Page / Remove Page
-//     - Eyedropper Color Sampler (Pick exact yellowish/shadow pixel color & paint over text!)
-//     - Custom Floating Text Placement with Size Slider & Color Picker
-//     - Background Isolate Filters (Zero Lag)
-// =============================================================================
 
 class AcrobatDocumentStudioScreen extends StatefulWidget {
   final List<EditableDocumentPage> initialPages;
@@ -3143,14 +2819,12 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
   late TextEditingController _titleCtrl;
   bool _processing = false;
 
-  // Eyedropper & Brush Blemish Eraser State
   bool _eyedropperSamplingMode = false;
   bool _brushEraserActive = false;
   Color _sampledPaperColor = const Color(0xFFF5F3EB);
   double _eraserBrushSize = 22.0;
   img.Image? _cachedDecodedCurrentPage;
 
-  // Selected Annotation for Font Size Changing
   int? _selectedAnnotationIdx;
 
   @override
@@ -3175,10 +2849,7 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
     }
 
     setState(() => _processing = true);
-    final result = await compute(
-      _applyFilterInBackgroundIsolate,
-      _IsolateFilterPayload(page.originalBytes, filter.index),
-    );
+    final result = await compute(_applyFilterInBackgroundIsolate, _IsolateFilterPayload(page.originalBytes, filter.index));
     if (mounted) {
       setState(() {
         page.activeFilter = filter;
@@ -3189,7 +2860,6 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
     }
   }
 
-  /// Samples the exact pixel RGB color at `(normX, normY)` from the camera page image
   Future<void> _samplePixelColorAt(Offset normPos) async {
     _cachedDecodedCurrentPage ??= img.decodeImage(_currentPage.displayBytes);
     final decoded = _cachedDecodedCurrentPage;
@@ -3202,16 +2872,12 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
     setState(() {
       _sampledPaperColor = Color.fromARGB(255, pixel.r.toInt(), pixel.g.toInt(), pixel.b.toInt());
       _eyedropperSamplingMode = false;
-      _brushEraserActive = true; // Automatically activate brush with sampled color!
+      _brushEraserActive = true;
     });
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Sampled exact background color! Drag on the page to erase/hide text.'),
-          backgroundColor: kBlueAccent,
-          duration: Duration(seconds: 2),
-        ),
+        const SnackBar(content: Text('Sampled exact background color! Drag on the page to erase.'), backgroundColor: kBlueAccent, duration: Duration(seconds: 2)),
       );
     }
   }
@@ -3230,14 +2896,7 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              TextField(
-                controller: txtCtrl,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Enter Text',
-                  border: OutlineInputBorder(),
-                ),
-              ),
+              TextField(controller: txtCtrl, autofocus: true, decoration: const InputDecoration(labelText: 'Enter Text', border: OutlineInputBorder())),
               const SizedBox(height: 14),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -3246,13 +2905,7 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                   Text('${chosenSize.round()} pt', style: const TextStyle(fontWeight: FontWeight.bold, color: kBlueAccent)),
                 ],
               ),
-              Slider(
-                value: chosenSize,
-                min: 10,
-                max: 44,
-                activeColor: kBlueAccent,
-                onChanged: (v) => setModal(() => chosenSize = v),
-              ),
+              Slider(value: chosenSize, min: 10, max: 44, activeColor: kBlueAccent, onChanged: (v) => setModal(() => chosenSize = v)),
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -3264,11 +2917,7 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                         margin: const EdgeInsets.only(right: 10),
                         width: 28,
                         height: 28,
-                        decoration: BoxDecoration(
-                          color: c,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: chosenColor == c ? kBlueAccent : Colors.transparent, width: 3),
-                        ),
+                        decoration: BoxDecoration(color: c, shape: BoxShape.circle, border: Border.all(color: chosenColor == c ? kBlueAccent : Colors.transparent, width: 3)),
                       ),
                     );
                   }),
@@ -3284,13 +2933,7 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                 if (txtCtrl.text.trim().isNotEmpty) {
                   setState(() {
                     _currentPage.annotations.add(
-                      PageAnnotationItem(
-                        type: 'text',
-                        text: txtCtrl.text.trim(),
-                        fontSize: chosenSize,
-                        color: chosenColor,
-                        normalizedPos: const Offset(0.45, 0.45),
-                      ),
+                      PageAnnotationItem(type: 'text', text: txtCtrl.text.trim(), fontSize: chosenSize, color: chosenColor, normalizedPos: const Offset(0.45, 0.45)),
                     );
                     _selectedAnnotationIdx = _currentPage.annotations.length - 1;
                   });
@@ -3368,7 +3011,6 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
     }
   }
 
-  /// Renders Eraser Strokes + Annotations + Searchable OCR into the compiled PDF
   Future<void> _compileAndSaveFinalPdf() async {
     setState(() => _processing = true);
 
@@ -3377,7 +3019,6 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
       for (int i = 0; i < _pages.length; i++) {
         final pItem = _pages[i];
 
-        // Bake any Eyedropper Blemish Eraser strokes directly onto the image bytes
         Uint8List workingBytes = pItem.displayBytes;
         if (pItem.eraserStrokes.isNotEmpty) {
           final decoded = img.decodeImage(workingBytes);
@@ -3422,11 +3063,7 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                       top: dy,
                       child: pw.Text(
                         ann.text,
-                        style: pw.TextStyle(
-                          color: PdfColor.fromInt(ann.color.value),
-                          fontWeight: pw.FontWeight.bold,
-                          fontSize: ann.fontSize,
-                        ),
+                        style: pw.TextStyle(color: PdfColor.fromInt(ann.color.value), fontWeight: pw.FontWeight.bold, fontSize: ann.fontSize),
                       ),
                     );
                   }
@@ -3462,7 +3099,7 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
         title: Text('Page ${_currentIndex + 1} of ${_pages.length}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
-            tooltip: 'Insert Page (Camera / Gallery)',
+            tooltip: 'Insert Page',
             icon: const Icon(Icons.note_add_outlined, color: kWhitePure),
             onPressed: () async {
               final picked = await ImagePicker().pickMultiImage(imageQuality: 92);
@@ -3477,7 +3114,7 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
             },
           ),
           IconButton(
-            tooltip: 'Remove Current Page from PDF',
+            tooltip: 'Remove Current Page',
             icon: const Icon(Icons.delete_forever_outlined, color: Colors.redAccent),
             onPressed: () {
               setState(() {
@@ -3493,7 +3130,6 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
       body: Column(
         children: [
           if (_processing) const LinearProgressIndicator(color: kBlueAccent),
-          // Top Document Title & Eyedropper Status Bar
           Container(
             color: kNavySecondary,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -3512,16 +3148,13 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                   ),
                 ),
                 const SizedBox(width: 10),
-                // Live Sampled Color Swatch Button
                 InkWell(
                   onTap: () {
                     setState(() {
                       _eyedropperSamplingMode = true;
                       _brushEraserActive = false;
                     });
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Tap anywhere on the page to sample its background color!')),
-                    );
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tap anywhere on the page to sample its background color!')));
                   },
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -3535,11 +3168,7 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                         Container(
                           width: 18,
                           height: 18,
-                          decoration: BoxDecoration(
-                            color: _sampledPaperColor,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: kWhitePure, width: 1.5),
-                          ),
+                          decoration: BoxDecoration(color: _sampledPaperColor, shape: BoxShape.circle, border: Border.all(color: kWhitePure, width: 1.5)),
                         ),
                         const SizedBox(width: 6),
                         const Icon(Icons.colorize, size: 16, color: kWhitePure),
@@ -3552,8 +3181,6 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
               ],
             ),
           ),
-
-          // Live Brush Eraser or Custom Text Font Size Slider Strip
           if (_brushEraserActive)
             Container(
               color: kBlueAccent.withOpacity(0.2),
@@ -3562,25 +3189,14 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                 children: [
                   const Text('Eraser Brush Size:', style: TextStyle(color: kWhitePure, fontSize: 12)),
                   Expanded(
-                    child: Slider(
-                      value: _eraserBrushSize,
-                      min: 8,
-                      max: 55,
-                      activeColor: kBlueAccent,
-                      onChanged: (v) => setState(() => _eraserBrushSize = v),
-                    ),
+                    child: Slider(value: _eraserBrushSize, min: 8, max: 55, activeColor: kBlueAccent, onChanged: (v) => setState(() => _eraserBrushSize = v)),
                   ),
                   IconButton(
-                    tooltip: 'Undo Last Eraser Stroke',
+                    tooltip: 'Undo',
                     icon: const Icon(Icons.undo, color: kWhitePure, size: 18),
-                    onPressed: _currentPage.eraserStrokes.isEmpty
-                        ? null
-                        : () => setState(() => _currentPage.eraserStrokes.removeLast()),
+                    onPressed: _currentPage.eraserStrokes.isEmpty ? null : () => setState(() => _currentPage.eraserStrokes.removeLast()),
                   ),
-                  TextButton(
-                    onPressed: () => setState(() => _brushEraserActive = false),
-                    child: const Text('Done', style: TextStyle(color: kBlueLight, fontWeight: FontWeight.bold)),
-                  ),
+                  TextButton(onPressed: () => setState(() => _brushEraserActive = false), child: const Text('Done', style: TextStyle(color: kBlueLight, fontWeight: FontWeight.bold))),
                 ],
               ),
             )
@@ -3597,27 +3213,19 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                       min: 10,
                       max: 48,
                       activeColor: kBlueAccent,
-                      onChanged: (v) {
-                        setState(() {
-                          _currentPage.annotations[_selectedAnnotationIdx!].fontSize = v;
-                        });
-                      },
+                      onChanged: (v) => setState(() => _currentPage.annotations[_selectedAnnotationIdx!].fontSize = v),
                     ),
                   ),
                   IconButton(
                     icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 18),
-                    onPressed: () {
-                      setState(() {
-                        _currentPage.annotations.removeAt(_selectedAnnotationIdx!);
-                        _selectedAnnotationIdx = null;
-                      });
-                    },
+                    onPressed: () => setState(() {
+                      _currentPage.annotations.removeAt(_selectedAnnotationIdx!);
+                      _selectedAnnotationIdx = null;
+                    }),
                   ),
                 ],
               ),
             ),
-
-          // Interactive Pinch-to-Zoom & Eyedropper Page Canvas
           Expanded(
             child: PageView.builder(
               physics: _brushEraserActive ? const NeverScrollableScrollPhysics() : const BouncingScrollPhysics(),
@@ -3647,26 +3255,16 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                             return GestureDetector(
                               onTapDown: _eyedropperSamplingMode
                                   ? (d) {
-                                      final norm = Offset(
-                                        (d.localPosition.dx / boxW).clamp(0.0, 1.0),
-                                        (d.localPosition.dy / boxH).clamp(0.0, 1.0),
-                                      );
+                                      final norm = Offset((d.localPosition.dx / boxW).clamp(0.0, 1.0), (d.localPosition.dy / boxH).clamp(0.0, 1.0));
                                       _samplePixelColorAt(norm);
                                     }
                                   : null,
                               onPanStart: _brushEraserActive
                                   ? (d) {
-                                      final norm = Offset(
-                                        (d.localPosition.dx / boxW).clamp(0.0, 1.0),
-                                        (d.localPosition.dy / boxH).clamp(0.0, 1.0),
-                                      );
+                                      final norm = Offset((d.localPosition.dx / boxW).clamp(0.0, 1.0), (d.localPosition.dy / boxH).clamp(0.0, 1.0));
                                       setState(() {
                                         page.eraserStrokes.add(
-                                          BlemishEraserStroke(
-                                            normalizedPoints: [norm],
-                                            sampledColor: _sampledPaperColor,
-                                            strokeWidth: _eraserBrushSize,
-                                          ),
+                                          BlemishEraserStroke(normalizedPoints: [norm], sampledColor: _sampledPaperColor, strokeWidth: _eraserBrushSize),
                                         );
                                       });
                                     }
@@ -3674,27 +3272,15 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                               onPanUpdate: _brushEraserActive
                                   ? (d) {
                                       if (page.eraserStrokes.isEmpty) return;
-                                      final norm = Offset(
-                                        (d.localPosition.dx / boxW).clamp(0.0, 1.0),
-                                        (d.localPosition.dy / boxH).clamp(0.0, 1.0),
-                                      );
-                                      setState(() {
-                                        page.eraserStrokes.last.normalizedPoints.add(norm);
-                                      });
+                                      final norm = Offset((d.localPosition.dx / boxW).clamp(0.0, 1.0), (d.localPosition.dy / boxH).clamp(0.0, 1.0));
+                                      setState(() => page.eraserStrokes.last.normalizedPoints.add(norm));
                                     }
                                   : null,
                               child: Stack(
                                 fit: StackFit.expand,
                                 children: [
-                                  RotatedBox(
-                                    quarterTurns: page.rotationQuarterTurns,
-                                    child: Image.memory(page.displayBytes, fit: BoxFit.fill),
-                                  ),
-                                  // Render Eyedropper Sampled Blemish Eraser Strokes
-                                  CustomPaint(
-                                    painter: _BlemishEraserCanvasPainter(strokes: page.eraserStrokes),
-                                  ),
-                                  // Render Draggable Text & Signatures
+                                  RotatedBox(quarterTurns: page.rotationQuarterTurns, child: Image.memory(page.displayBytes, fit: BoxFit.fill)),
+                                  CustomPaint(painter: _BlemishEraserCanvasPainter(strokes: page.eraserStrokes)),
                                   ...List.generate(page.annotations.length, (annIdx) {
                                     final ann = page.annotations[annIdx];
                                     final isSelected = _selectedAnnotationIdx == annIdx;
@@ -3703,32 +3289,19 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                                       top: ann.normalizedPos.dy * boxH - 16,
                                       child: GestureDetector(
                                         onTap: () => setState(() => _selectedAnnotationIdx = annIdx),
-                                        onPanUpdate: (d) {
-                                          setState(() {
-                                            _selectedAnnotationIdx = annIdx;
-                                            final nx = (ann.normalizedPos.dx + d.delta.dx / boxW).clamp(0.05, 0.92);
-                                            final ny = (ann.normalizedPos.dy + d.delta.dy / boxH).clamp(0.05, 0.92);
-                                            ann.normalizedPos = Offset(nx, ny);
-                                          });
-                                        },
+                                        onPanUpdate: (d) => setState(() {
+                                          _selectedAnnotationIdx = annIdx;
+                                          ann.normalizedPos = Offset(
+                                            (ann.normalizedPos.dx + d.delta.dx / boxW).clamp(0.05, 0.92),
+                                            (ann.normalizedPos.dy + d.delta.dy / boxH).clamp(0.05, 0.92),
+                                          );
+                                        }),
                                         child: Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                          decoration: isSelected
-                                              ? BoxDecoration(
-                                                  border: Border.all(color: kBlueAccent, width: 1.5),
-                                                  borderRadius: BorderRadius.circular(4),
-                                                )
-                                              : null,
+                                          decoration: isSelected ? BoxDecoration(border: Border.all(color: kBlueAccent, width: 1.5), borderRadius: BorderRadius.circular(4)) : null,
                                           child: ann.type == 'signature' && ann.signaturePng != null
                                               ? Image.memory(ann.signaturePng!, width: 130, height: 60)
-                                              : Text(
-                                                  ann.text,
-                                                  style: TextStyle(
-                                                    color: ann.color,
-                                                    fontSize: ann.fontSize,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
+                                              : Text(ann.text, style: TextStyle(color: ann.color, fontSize: ann.fontSize, fontWeight: FontWeight.bold)),
                                         ),
                                       ),
                                     );
@@ -3745,8 +3318,6 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
               },
             ),
           ),
-
-          // Filter Strip
           Container(
             height: 44,
             color: kNavySecondary,
@@ -3757,18 +3328,11 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                 final selected = _currentPage.activeFilter == f;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Text(f.label, style: const TextStyle(fontSize: 11.5)),
-                    selected: selected,
-                    selectedColor: kBlueLight,
-                    onSelected: (_) => _applyFilterFastIsolate(f),
-                  ),
+                  child: ChoiceChip(label: Text(f.label, style: const TextStyle(fontSize: 11.5)), selected: selected, selectedColor: kBlueLight, onSelected: (_) => _applyFilterFastIsolate(f)),
                 );
               }).toList(),
             ),
           ),
-
-          // Bottom Studio Toolbar
           Container(
             color: kNavyPrimary,
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 14),
@@ -3778,17 +3342,8 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      _studioActionBtn(
-                        icon: Icons.text_fields_rounded,
-                        label: 'Add Text',
-                        onTap: _openAddCustomTextDialog,
-                      ),
-                      _studioActionBtn(
-                        icon: Icons.brush_outlined,
-                        label: _brushEraserActive ? 'Eraser ON' : 'Color Eraser',
-                        isActive: _brushEraserActive,
-                        onTap: () => setState(() => _brushEraserActive = !_brushEraserActive),
-                      ),
+                      _studioActionBtn(icon: Icons.text_fields_rounded, label: 'Add Text', onTap: _openAddCustomTextDialog),
+                      _studioActionBtn(icon: Icons.brush_outlined, label: _brushEraserActive ? 'Eraser ON' : 'Color Eraser', isActive: _brushEraserActive, onTap: () => setState(() => _brushEraserActive = !_brushEraserActive)),
                       _studioActionBtn(
                         icon: Icons.crop_free,
                         label: '4-Corner Crop',
@@ -3796,10 +3351,7 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                           final warped = await Navigator.push<Uint8List>(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => FourCornerPerspectiveCropScreen(
-                                imageBytes: _currentPage.originalBytes,
-                                pageTitle: '4-Corner Perspective Crop',
-                              ),
+                              builder: (_) => FourCornerPerspectiveCropScreen(imageBytes: _currentPage.originalBytes, pageTitle: '4-Corner Perspective Crop'),
                             ),
                           );
                           if (warped != null) {
@@ -3827,16 +3379,8 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                           ),
                         ),
                       ),
-                      _studioActionBtn(
-                        icon: Icons.rotate_right,
-                        label: 'Rotate 90°',
-                        onTap: () => setState(() => _currentPage.rotationQuarterTurns = (_currentPage.rotationQuarterTurns + 1) % 4),
-                      ),
-                      _studioActionBtn(
-                        icon: Icons.draw_outlined,
-                        label: 'Sign Ink',
-                        onTap: _openSignaturePadModal,
-                      ),
+                      _studioActionBtn(icon: Icons.rotate_right, label: 'Rotate 90°', onTap: () => setState(() => _currentPage.rotationQuarterTurns = (_currentPage.rotationQuarterTurns + 1) % 4)),
+                      _studioActionBtn(icon: Icons.draw_outlined, label: 'Sign Ink', onTap: _openSignaturePadModal),
                     ],
                   ),
                 ),
@@ -3845,22 +3389,10 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                   children: [
                     const Text('Compress:', style: TextStyle(color: Colors.white70, fontSize: 12)),
                     Expanded(
-                      child: Slider(
-                        value: _quality.toDouble(),
-                        min: 20,
-                        max: 100,
-                        divisions: 8,
-                        activeColor: kBlueAccent,
-                        label: '$_quality%',
-                        onChanged: (v) => setState(() => _quality = v.round()),
-                      ),
+                      child: Slider(value: _quality.toDouble(), min: 20, max: 100, divisions: 8, activeColor: kBlueAccent, label: '$_quality%', onChanged: (v) => setState(() => _quality = v.round())),
                     ),
                     FilledButton.icon(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: kBlueAccent,
-                        foregroundColor: kWhitePure,
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                      ),
+                      style: FilledButton.styleFrom(backgroundColor: kBlueAccent, foregroundColor: kWhitePure, padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12)),
                       onPressed: _processing ? null : _compileAndSaveFinalPdf,
                       icon: const Icon(Icons.save_alt, size: 18),
                       label: Text(_processing ? 'Saving...' : 'Save PDF', style: const TextStyle(fontWeight: FontWeight.w900)),
@@ -3875,12 +3407,7 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
     );
   }
 
-  Widget _studioActionBtn({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-    bool isActive = false,
-  }) {
+  Widget _studioActionBtn({required IconData icon, required String label, required VoidCallback onTap, bool isActive = false}) {
     return Padding(
       padding: const EdgeInsets.only(right: 10),
       child: OutlinedButton.icon(
@@ -3955,10 +3482,6 @@ class _InkSignaturePainter extends CustomPainter {
   bool shouldRepaint(covariant _InkSignaturePainter oldDelegate) => true;
 }
 
-// =============================================================================
-// 11. SMART 4-CORNER PERSPECTIVE CROP STUDIO (AUTO EDGE DETECTION + ISOLATE WARP)
-// =============================================================================
-
 class FourCornerPerspectiveCropScreen extends StatefulWidget {
   final Uint8List imageBytes;
   final String pageTitle;
@@ -3984,7 +3507,6 @@ class _FourCornerPerspectiveCropScreenState extends State<FourCornerPerspectiveC
     _detectDocumentEdgesSmart();
   }
 
-  /// Analyzes luminance contrast gradients from outer borders inward to snap to real paper boundaries
   Future<void> _detectDocumentEdgesSmart() async {
     final decoded = img.decodeImage(widget.imageBytes);
     if (decoded == null) return;
@@ -3996,11 +3518,9 @@ class _FourCornerPerspectiveCropScreenState extends State<FourCornerPerspectiveC
     int minY = (h * 0.05).round();
     int maxY = (h * 0.95).round();
 
-    // Sample center paper brightness vs border brightness
     final centerPix = decoded.getPixel(w ~/ 2, h ~/ 2);
     final centerLum = (centerPix.r + centerPix.g + centerPix.b) / 3.0;
 
-    // Scan top-down along vertical midline
     for (int y = (h * 0.02).round(); y < (h * 0.35).round(); y += 4) {
       final p = decoded.getPixel(w ~/ 2, y);
       final lum = (p.r + p.g + p.b) / 3.0;
@@ -4009,7 +3529,6 @@ class _FourCornerPerspectiveCropScreenState extends State<FourCornerPerspectiveC
         break;
       }
     }
-    // Scan bottom-up
     for (int y = (h * 0.98).round(); y > (h * 0.65).round(); y -= 4) {
       final p = decoded.getPixel(w ~/ 2, y);
       final lum = (p.r + p.g + p.b) / 3.0;
@@ -4018,7 +3537,6 @@ class _FourCornerPerspectiveCropScreenState extends State<FourCornerPerspectiveC
         break;
       }
     }
-    // Scan left-to-right
     for (int x = (w * 0.02).round(); x < (w * 0.35).round(); x += 4) {
       final p = decoded.getPixel(x, h ~/ 2);
       final lum = (p.r + p.g + p.b) / 3.0;
@@ -4027,7 +3545,6 @@ class _FourCornerPerspectiveCropScreenState extends State<FourCornerPerspectiveC
         break;
       }
     }
-    // Scan right-to-left
     for (int x = (w * 0.98).round(); x > (w * 0.65).round(); x -= 4) {
       final p = decoded.getPixel(x, h ~/ 2);
       final lum = (p.r + p.g + p.b) / 3.0;
@@ -4096,9 +3613,7 @@ class _FourCornerPerspectiveCropScreenState extends State<FourCornerPerspectiveC
                           closestIdx = i;
                         }
                       }
-                      if (minDist < 0.25) {
-                        setState(() => _activeDragIndex = closestIdx);
-                      }
+                      if (minDist < 0.25) setState(() => _activeDragIndex = closestIdx);
                     },
                     onPanUpdate: (details) {
                       if (_activeDragIndex == null) return;
@@ -4146,10 +3661,7 @@ class _FourCornerPerspectiveCropScreenState extends State<FourCornerPerspectiveC
                               _corners[2].dx, _corners[2].dy,
                               _corners[3].dx, _corners[3].dy,
                             ];
-                            final warped = await compute(
-                              _performPerspectiveWarpInIsolate,
-                              _IsolateWarpPayload(widget.imageBytes, coords),
-                            );
+                            final warped = await compute(_performPerspectiveWarpInIsolate, _IsolateWarpPayload(widget.imageBytes, coords));
                             if (mounted) Navigator.pop(context, warped);
                           },
                     icon: const Icon(Icons.crop_rotate),
@@ -4194,10 +3706,6 @@ class _PerspectiveCropGridPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _PerspectiveCropGridPainter oldDelegate) => true;
 }
-
-// =============================================================================
-// 12. IN-PLACE VISUAL OCR & WORD SEARCH OVERLAY (ENGLISH, HINDI & PUNJABI)
-// =============================================================================
 
 class InPlaceSelectableOcrScreen extends StatefulWidget {
   final Uint8List imageBytes;
@@ -4282,7 +3790,7 @@ class _InPlaceSelectableOcrScreenState extends State<InPlaceSelectableOcrScreen>
         title: TextField(
           style: const TextStyle(color: kWhitePure, fontSize: 14.5),
           decoration: const InputDecoration(
-            hintText: 'Search word on picture (Eng / Hindi / Punjabi)...',
+            hintText: 'Search word on picture...',
             hintStyle: TextStyle(color: Colors.white60, fontSize: 13),
             border: InputBorder.none,
             prefixIcon: Icon(Icons.search, color: kBlueLight, size: 18),
@@ -4309,12 +3817,10 @@ class _InPlaceSelectableOcrScreenState extends State<InPlaceSelectableOcrScreen>
               setState(() => _lang = m);
               _performInPlaceOcr();
             },
-            itemBuilder: (_) => OcrLanguageMode.values
-                .map((m) => PopupMenuItem(value: m, child: Text(m.label)))
-                .toList(),
+            itemBuilder: (_) => OcrLanguageMode.values.map((m) => PopupMenuItem(value: m, child: Text(m.label))).toList(),
           ),
           IconButton(
-            tooltip: 'Select All Words',
+            tooltip: 'Select All',
             icon: const Icon(Icons.select_all),
             onPressed: () => setState(() {
               if (_selectedIndices.length == _wordBoxes.length) {
@@ -4347,9 +3853,7 @@ class _InPlaceSelectableOcrScreenState extends State<InPlaceSelectableOcrScreen>
                           for (int i = 0; i < _wordBoxes.length; i++) {
                             final r = _wordBoxes[i].boundingBox;
                             final scaledRect = Rect.fromLTRB(r.left * scaleX, r.top * scaleY, r.right * scaleX, r.bottom * scaleY);
-                            if (scaledRect.inflate(4).contains(pt)) {
-                              setState(() => _selectedIndices.add(i));
-                            }
+                            if (scaledRect.inflate(4).contains(pt)) setState(() => _selectedIndices.add(i));
                           }
                         },
                         child: Stack(
@@ -4399,9 +3903,7 @@ class _InPlaceSelectableOcrScreenState extends State<InPlaceSelectableOcrScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _selectedIndices.isEmpty
-                      ? 'Tap or drag across words on the picture to copy, or use the top search bar.'
-                      : 'Selected (${_selectedIndices.length} words): $_selectedTextString',
+                  _selectedIndices.isEmpty ? 'Tap or drag across words on the picture to copy.' : 'Selected (${_selectedIndices.length} words): $_selectedTextString',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: kWhitePure, fontSize: 12.5),
