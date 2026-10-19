@@ -1,15 +1,3 @@
-MainActivity.kt:1:9 Package name must be a '.'-separated identifier list
-```[span_1](start_span)[span_1](end_span)
-In **Kotlin**, the word **`in`** is a reserved keyword (like `for (x in list)`). Because your domain starts with `in.adeshnarang.an_scan`, Kotlin requires `in` to be wrapped in backticks (`package `in`.adeshnarang.an_scan`)—or even better, using standard **`com.adeshnarang.an_scan`** as the internal Android package namespace so Kotlin never complains about reserved keywords!
-
-**You do NOT need to touch `lib/main.dart` or `pubspec.yaml` at all.** They are already 100% working.
-
-Just replace **`.github/workflows/main.yml`** with this fixed version below, and click **Run workflow**:
-
----
-
-### Updated `.github/workflows/main.yml` (Only file you need to update)
-```yaml
 name: Build AN Scan Production APK
 
 on:
@@ -129,7 +117,7 @@ jobs:
               base_img.resize((px, px), Image.Resampling.LANCZOS).save(f"{out_dir}/ic_launcher.png")
           EOF
 
-      - name: Configure Native Kotlin Intent Interceptor (Fixed Package Identifier)
+      - name: Configure Native Kotlin Intent Interceptor
         run: |
           rm -rf android/app/src/main/kotlin/in
           mkdir -p android/app/src/main/kotlin/com/adeshnarang/an_scan
@@ -349,7 +337,7 @@ jobs:
       - name: Compile Release APK
         run: flutter build apk --release --no-shrink
 
-      - name: Upload APK Artifact
+      - name: Upload AN Scan Release APK
         uses: actions/upload-artifact@v4
         with:
           name: AN-Scan-Release-APK
