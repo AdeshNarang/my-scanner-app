@@ -1131,4 +1131,1136 @@ class _ExecutiveMasterShellState extends State<ExecutiveMasterShell> {
                 child: ChoiceChip(
                   label: Text(cat),
                   selected: selected,
-                  onSelected: (_) => setState(() => _
+                  onSelected: (_) => setState(() => _selectedCategory = cat),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        Expanded(
+          child: filtered.isEmpty
+              ? const Center(child: Text('No matching documents in this category.'))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(12),
+                  itemCount: filtered.length,
+                  itemBuilder: (_, i) => _buildFileCard(filtered[i]),
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFileCard(VaultFile file) {
+    Color badge = const Color(0xFFDC2626);
+    if (file.ext == 'XLSX' || file.ext == 'CSV') badge = const Color(0xFF15803D);
+    if (file.ext == 'DOCX') badge = const Color(0xFF1D4ED8);
+    if (file.ext == 'TXT') badge = const Color(0xFF475569);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: ListTile(
+        onTap: () => _openInAppViewer(file),
+        leading: Container(
+          width: 44,
+          height: 44,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: badge.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text(
+            file.ext,
+            style: TextStyle(color: badge, fontWeight: FontWeight.w900, fontSize: 11),
+          ),
+        ),
+        title: Row(
+          children: [
+            if (file.isLocked)
+              const Padding(
+                padding: EdgeInsets.only(right: 6),
+                child: Icon(Icons.lock, size: 15, color: Color(0xFFB45309)),
+              ),
+            Expanded(
+              child: Text(
+                file.name,
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        subtitle: Text(
+          '${_formatBytes(file.sizeBytes)} • ${DateFormat('dd MMM yyyy, hh:mm a').format(file.modified)}',
+          style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+        ),
+        trailing: PopupMenuButton<String>(
+          onSelected: (action) async {
+            if (action == 'view') {
+              await _openInAppViewer(file);
+            } else if (action == 'external') {
+              if (file.isLocked && !await _verifyPinDialog('Unlock ${file.name}')) return;
+              await OpenFilex.open(file.path);
+            } else if (action == 'pdf_to_word' && file.ext == 'PDF') {
+              await _convertPdfToWord(file);
+            } else if (action == 'lock') {
+              await _toggleFileLock(file);
+            } else if (action == 'share') {
+              if (file.isLocked && !await _verifyPinDialog('Unlock ${file.name}')) return;
+              await Share.shareXFiles([XFile(file.path)], text: file.name);
+            } else if (action == 'print' && file.ext == 'PDF') {
+              final bytes = await File(file.path).readAsBytes();
+              await Printing.layoutPdf(onLayout: (_) async => bytes);
+            } else if (action == 'delete') {
+              if (file.isLocked && !await _verifyPinDialog('Unlock to Delete')) return;
+              await File(file.path).delete();
+              await _reloadVault();
+            }
+          },
+          itemBuilder: (_) => [
+            const PopupMenuItem(value: 'view', child: Text('Open in AN Office Studio')),
+            const PopupMenuItem(value: 'external', child: Text('Open External System App')),
+            if (file.ext == 'PDF')
+              const PopupMenuItem(value: 'pdf_to_word', child: Text('Convert PDF to Word (.docx)')),
+            PopupMenuItem(
+              value: 'lock',
+              child: Text(file.isLocked ? 'Remove PIN Lock' : 'Lock File with PIN'),
+            ),
+            const PopupMenuItem(value: 'share', child: Text('Share / Cloud Backup')),
+            if (file.ext == 'PDF')
+              const PopupMenuItem(value: 'print', child: Text('Wireless Print PDF')),
+            const PopupMenuItem(
+              value: 'delete',
+              child: Text('Delete File', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showAccountSwitcher() async {
+    final newAccCtrl = TextEditingController();
+    await showModalBottomSheet(
+      context: context,
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Multi-User Workspace Profiles',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            ..._accounts.map(
+              (acc) => ListTile(
+                leading: Icon(
+                  acc == _currentAccount ? Icons.radio_button_checked : Icons.radio_button_off,
+                  color: const Color(0xFF0F172A),
+                ),
+                title: Text(acc),
+                onTap: () async {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setString('active_account', acc);
+                  setState(() => _currentAccount = acc);
+                  await _reloadVault();
+                  if (ctx.mounted) Navigator.pop(ctx);
+                },
+              ),
+            ),
+            const Divider(),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: newAccCtrl,
+                    decoration: const InputDecoration(
+                      hintText: 'Add New Firm / User Account',
+                      isDense: true,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    final name = newAccCtrl.text.trim();
+                    if (name.isNotEmpty && !_accounts.contains(name)) {
+                      final prefs = await SharedPreferences.getInstance();
+                      _accounts.add(name);
+                      await prefs.setStringList('user_accounts', _accounts);
+                      await prefs.setString('active_account', name);
+                      setState(() => _currentAccount = name);
+                      await _reloadVault();
+                      if (ctx.mounted) Navigator.pop(ctx);
+                    }
+                  },
+                  child: const Text('Add & Switch'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSettingsAndAccountsTab() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Card(
+          child: ListTile(
+            leading: const CircleAvatar(
+              backgroundColor: Color(0xFF0F172A),
+              foregroundColor: Color(0xFFD4AF37),
+              child: Icon(Icons.person_outline),
+            ),
+            title: Text(_currentAccount, style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: const Text('Isolated Multi-User Vault Directory'),
+            trailing: OutlinedButton(
+              onPressed: _showAccountSwitcher,
+              child: const Text('Switch'),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Card(
+          child: SwitchListTile(
+            secondary: const Icon(Icons.cloud_sync_outlined, color: Color(0xFF1D4ED8)),
+            title: const Text('Automated Cloud Drive Backup Sync'),
+            subtitle: const Text('Ready to export/sync workspace bundle to Google Drive / OneDrive'),
+            value: _autoCloudSync,
+            onChanged: (v) async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setBool('auto_cloud_sync', v);
+              setState(() => _autoCloudSync = v);
+            },
+          ),
+        ),
+        const SizedBox(height: 10),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Default Tiered PDF Compression',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                SegmentedButton<int>(
+                  segments: const [
+                    ButtonSegment(value: 35, label: Text('Extreme (35%)')),
+                    ButtonSegment(value: 75, label: Text('Balanced (75%)')),
+                    ButtonSegment(value: 95, label: Text('Ultra HD (95%)')),
+                  ],
+                  selected: {_defaultCompression},
+                  onSelectionChanged: (s) async {
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setInt('default_compression', s.first);
+                    setState(() => _defaultCompression = s.first);
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.lock_person_outlined, color: Color(0xFFB45309)),
+            title: const Text('Master PIN & Document Password Lock'),
+            subtitle: Text(_masterPin == null || _masterPin!.isEmpty ? 'Not Set' : '4-Digit PIN Active'),
+            trailing: Switch(
+              value: _masterPin != null && _masterPin!.isNotEmpty,
+              onChanged: (enable) async {
+                final prefs = await SharedPreferences.getInstance();
+                if (!enable) {
+                  await prefs.remove('master_pin');
+                  setState(() => _masterPin = null);
+                } else {
+                  final ctrl = TextEditingController();
+                  final pin = await showDialog<String>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Set 4-Digit Master PIN'),
+                      content: TextField(
+                        controller: ctrl,
+                        keyboardType: TextInputType.number,
+                        maxLength: 4,
+                        decoration: const InputDecoration(labelText: 'Enter 4-Digit PIN'),
+                      ),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+                        FilledButton(
+                          onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+                          child: const Text('Save PIN'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (pin != null && pin.length == 4) {
+                    await prefs.setString('master_pin', pin);
+                    setState(() => _masterPin = pin);
+                  }
+                }
+              },
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.verified_outlined, color: Color(0xFF0F172A)),
+            title: const Text('Designed & Engineered by Adesh Narang'),
+            subtitle: const Text('Official Portal: https://adeshnarang.in'),
+            trailing: const Icon(Icons.open_in_new),
+            onTap: () => launchUrl(Uri.parse('https://adeshnarang.in')),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class InteractiveScanStudio extends StatefulWidget {
+  final List<String> initialPaths;
+  final int defaultCompression;
+  final Future<void> Function(Uint8List pdfBytes, String fileName, bool lockFile) onSavePdf;
+
+  const InteractiveScanStudio({
+    super.key,
+    required this.initialPaths,
+    required this.defaultCompression,
+    required this.onSavePdf,
+  });
+
+  @override
+  State<InteractiveScanStudio> createState() => _InteractiveScanStudioState();
+}
+
+class _InteractiveScanStudioState extends State<InteractiveScanStudio> {
+  late List<EditablePageItem> _pages;
+  int _idx = 0;
+  late int _compressionQuality;
+  bool _lockWithPin = false;
+  bool _isCompiling = false;
+  late TextEditingController _nameCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _pages = widget.initialPaths.map((p) => EditablePageItem(imagePath: p)).toList();
+    _compressionQuality = widget.defaultCompression;
+    _nameCtrl = TextEditingController(
+      text: 'AN_Scan_${DateFormat('ddMMM_HHmm').format(DateTime.now())}',
+    );
+  }
+
+  Future<void> _addTextOverlayDialog() async {
+    final ctrl = TextEditingController(text: _pages[_idx].overlayText);
+    final res = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Add Movable Page Annotation / Stamp'),
+        content: TextField(
+          controller: ctrl,
+          decoration: const InputDecoration(
+            labelText: 'Annotation Text (e.g., VERIFIED / Invoice #)',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Text('Apply'),
+          ),
+        ],
+      ),
+    );
+    if (res != null) {
+      setState(() => _pages[_idx].overlayText = res);
+    }
+  }
+
+  Future<void> _openReorderSheet() async {
+    await showModalBottomSheet(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModal) => Column(
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(14),
+              child: Text(
+                'Long-Press & Drag to Reorder Pages',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ),
+            Expanded(
+              child: ReorderableListView.builder(
+                itemCount: _pages.length,
+                onReorder: (oldIdx, newIdx) {
+                  setState(() {
+                    if (newIdx > oldIdx) newIdx -= 1;
+                    final item = _pages.removeAt(oldIdx);
+                    _pages.insert(newIdx, item);
+                    _idx = 0;
+                  });
+                  setModal(() {});
+                },
+                itemBuilder: (_, i) => ListTile(
+                  key: ValueKey(_pages[i].imagePath + i.toString()),
+                  leading: Image.file(File(_pages[i].imagePath), width: 42, height: 42, fit: BoxFit.cover),
+                  title: Text('Page ${i + 1}'),
+                  subtitle: Text('Filter: ${_pages[i].filterMode.toUpperCase()}'),
+                  trailing: const Icon(Icons.drag_handle),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<double>? _getFilterMatrix(String mode) {
+    if (mode == 'bw') {
+      return [
+        0.35, 0.55, 0.10, 0, 25,
+        0.35, 0.55, 0.10, 0, 25,
+        0.35, 0.55, 0.10, 0, 25,
+        0,    0,    0,    1, 0,
+      ];
+    } else if (mode == 'gray') {
+      return [
+        0.2126, 0.7152, 0.0722, 0, 0,
+        0.2126, 0.7152, 0.0722, 0, 0,
+        0.2126, 0.7152, 0.0722, 0, 0,
+        0,      0,      0,      1, 0,
+      ];
+    } else if (mode == 'magic') {
+      return [
+        1.25, 0,    0,    0, 10,
+        0,    1.25, 0,    0, 10,
+        0,    0,    1.25, 0, 10,
+        0,    0,    0,    1, 0,
+      ];
+    }
+    return null;
+  }
+
+  Future<void> _compileAndSavePdf() async {
+    setState(() => _isCompiling = true);
+    try {
+      final pdf = pw.Document();
+      for (final pageItem in _pages) {
+        final compressed = await FlutterImageCompress.compressWithFile(
+          pageItem.imagePath,
+          quality: _compressionQuality,
+          rotate: pageItem.quarterTurns * 90,
+        );
+        final bytes = compressed ?? await File(pageItem.imagePath).readAsBytes();
+        final img = pw.MemoryImage(bytes);
+
+        pdf.addPage(
+          pw.Page(
+            pageFormat: PdfPageFormat.a4,
+            margin: const pw.EdgeInsets.all(14),
+            build: (_) => pw.Stack(
+              children: [
+                pw.Center(child: pw.Image(img, fit: pw.BoxFit.contain)),
+                if (pageItem.overlayText.isNotEmpty)
+                  pw.Positioned(
+                    left: pageItem.overlayPosition.dx,
+                    top: pageItem.overlayPosition.dy,
+                    child: pw.Container(
+                      padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: pw.BoxDecoration(
+                        border: pw.Border.all(color: PdfColors.blue900, width: 1.5),
+                      ),
+                      child: pw.Text(
+                        pageItem.overlayText,
+                        style: pw.TextStyle(
+                          color: PdfColors.blue900,
+                          fontWeight: pw.FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      }
+
+      final outBytes = await pdf.save();
+      await widget.onSavePdf(outBytes, _nameCtrl.text.trim(), _lockWithPin);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Compiled PDF Saved to AN Office Vault!')),
+        );
+        Navigator.pop(context);
+      }
+    } finally {
+      if (mounted) setState(() => _isCompiling = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final current = _pages[_idx];
+    final matrix = _getFilterMatrix(current.filterMode);
+
+    Widget previewImg = RotatedBox(
+      quarterTurns: current.quarterTurns,
+      child: Image.file(File(current.imagePath), fit: BoxFit.contain),
+    );
+    if (matrix != null) {
+      previewImg = ColorFiltered(colorFilter: ColorFilter.matrix(matrix), child: previewImg);
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Edit Page ${_idx + 1} of ${_pages.length}'),
+        actions: [
+          IconButton(
+            tooltip: 'Rotate 90°',
+            onPressed: () => setState(() => current.quarterTurns = (current.quarterTurns + 1) % 4),
+            icon: const Icon(Icons.rotate_right),
+          ),
+          IconButton(
+            tooltip: 'Add Movable Text',
+            onPressed: _addTextOverlayDialog,
+            icon: const Icon(Icons.text_fields),
+          ),
+          IconButton(
+            tooltip: 'Reorder Pages',
+            onPressed: _openReorderSheet,
+            icon: const Icon(Icons.low_priority),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+            child: TextField(
+              controller: _nameCtrl,
+              decoration: InputDecoration(
+                labelText: 'PDF Document Name',
+                border: const OutlineInputBorder(),
+                isDense: true,
+                suffixIcon: IconButton(
+                  tooltip: 'Toggle PIN Lock on Save',
+                  icon: Icon(
+                    _lockWithPin ? Icons.lock : Icons.lock_open,
+                    color: _lockWithPin ? const Color(0xFFB45309) : Colors.grey,
+                  ),
+                  onPressed: () => setState(() => _lockWithPin = !_lockWithPin),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: PageView.builder(
+              itemCount: _pages.length,
+              onPageChanged: (i) => setState(() => _idx = i),
+              itemBuilder: (_, i) => Stack(
+                alignment: Alignment.center,
+                children: [
+                  Padding(padding: const EdgeInsets.all(12), child: previewImg),
+                  if (current.overlayText.isNotEmpty)
+                    Positioned(
+                      left: current.overlayPosition.dx,
+                      top: current.overlayPosition.dy,
+                      child: GestureDetector(
+                        onPanUpdate: (d) {
+                          setState(() {
+                            current.overlayPosition += d.delta;
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.88),
+                            border: Border.all(color: const Color(0xFF0F172A), width: 2),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            current.overlayText,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              children: [
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (final mode in [
+                        ('original', 'Original'),
+                        ('magic', 'Magic Color'),
+                        ('bw', 'High-Contrast B&W'),
+                        ('gray', 'Grayscale'),
+                      ])
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ChoiceChip(
+                            label: Text(mode.$2),
+                            selected: current.filterMode == mode.$1,
+                            onSelected: (_) => setState(() => current.filterMode = mode.$1),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Row(
+                  children: [
+                    const Text('Size Compression:', style: TextStyle(fontSize: 12)),
+                    Expanded(
+                      child: Slider(
+                        value: _compressionQuality.toDouble(),
+                        min: 25,
+                        max: 100,
+                        divisions: 15,
+                        label: '$_compressionQuality%',
+                        onChanged: (v) => setState(() => _compressionQuality = v.round()),
+                      ),
+                    ),
+                    Text('$_compressionQuality%', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _isCompiling ? null : _compileAndSavePdf,
+                    icon: const Icon(Icons.picture_as_pdf),
+                    label: Text(_isCompiling ? 'Compiling PDF...' : 'Save High-Clarity PDF to Vault'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class ExcelSpreadsheetStudio extends StatefulWidget {
+  final List<Map<String, String>>? prefilledRows;
+  final String? existingFilePath;
+  final Future<void> Function(Uint8List bytes, String fileNameWithExt) onSaveFile;
+
+  const ExcelSpreadsheetStudio({
+    super.key,
+    this.prefilledRows,
+    this.existingFilePath,
+    required this.onSaveFile,
+  });
+
+  @override
+  State<ExcelSpreadsheetStudio> createState() => _ExcelSpreadsheetStudioState();
+}
+
+class _ExcelSpreadsheetStudioState extends State<ExcelSpreadsheetStudio> {
+  late TextEditingController _nameCtrl;
+  final TextEditingController _openingBalCtrl = TextEditingController(text: '0.00');
+  double _gstPercent = 0.0;
+  final List<Map<String, TextEditingController>> _rows = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _nameCtrl = TextEditingController(
+      text: widget.existingFilePath != null
+          ? p.basenameWithoutExtension(widget.existingFilePath!)
+          : 'Ledger_${DateFormat('ddMMM_HHmm').format(DateTime.now())}',
+    );
+    _initRows();
+  }
+
+  Future<void> _initRows() async {
+    if (widget.existingFilePath != null && File(widget.existingFilePath!).existsSync()) {
+      try {
+        final bytes = await File(widget.existingFilePath!).readAsBytes();
+        final excel = xls.Excel.decodeBytes(bytes);
+        for (final table in excel.tables.keys) {
+          final sheet = excel.tables[table]!;
+          for (int r = 1; r < sheet.rows.length; r++) {
+            final row = sheet.rows[r];
+            final col0 = row.isNotEmpty ? (row[0]?.value?.toString() ?? '') : '';
+            if (col0.startsWith('GRAND TOTAL')) continue;
+            final col1 = row.length > 1 ? (row[1]?.value?.toString() ?? '1') : '1';
+            final col2 = row.length > 2 ? (row[2]?.value?.toString() ?? '0') : '0';
+            _rows.add({
+              'item': TextEditingController(text: col0),
+              'qty': TextEditingController(text: col1),
+              'rate': TextEditingController(text: col2),
+            });
+          }
+          break;
+        }
+      } catch (_) {}
+    } else if (widget.prefilledRows != null && widget.prefilledRows!.isNotEmpty) {
+      for (final r in widget.prefilledRows!) {
+        _rows.add({
+          'item': TextEditingController(text: r['item'] ?? ''),
+          'qty': TextEditingController(text: r['qty'] ?? '1'),
+          'rate': TextEditingController(text: r['rate'] ?? '0'),
+        });
+      }
+    }
+
+    if (_rows.isEmpty) {
+      for (int i = 0; i < 6; i++) {
+        _rows.add({
+          'item': TextEditingController(),
+          'qty': TextEditingController(text: '1'),
+          'rate': TextEditingController(text: '0.00'),
+        });
+      }
+    }
+    if (mounted) setState(() {});
+  }
+
+  double _rowTotal(int i) {
+    final q = double.tryParse(_rows[i]['qty']!.text) ?? 0.0;
+    final r = double.tryParse(_rows[i]['rate']!.text) ?? 0.0;
+    return q * r;
+  }
+
+  double _subTotal() {
+    double sum = double.tryParse(_openingBalCtrl.text) ?? 0.0;
+    for (int i = 0; i < _rows.length; i++) {
+      sum += _rowTotal(i);
+    }
+    return sum;
+  }
+
+  double _grandTotal() {
+    final sub = _subTotal();
+    return sub + (sub * (_gstPercent / 100.0));
+  }
+
+  Future<void> _saveSpreadsheet({required bool asCsv}) async {
+    final baseName = _nameCtrl.text.trim().isEmpty ? 'Ledger' : _nameCtrl.text.trim();
+    if (asCsv) {
+      final sb = StringBuffer();
+      sb.writeln('Particulars,Qty,Rate,Amount');
+      for (int i = 0; i < _rows.length; i++) {
+        sb.writeln(
+          '"${_rows[i]['item']!.text}",${_rows[i]['qty']!.text},${_rows[i]['rate']!.text},${_rowTotal(i).toStringAsFixed(2)}',
+        );
+      }
+      sb.writeln('GRAND TOTAL,,,${_grandTotal().toStringAsFixed(2)}');
+      await widget.onSaveFile(Uint8List.fromList(utf8.encode(sb.toString())), '$baseName.csv');
+    } else {
+      final excel = xls.Excel.createExcel();
+      final sheet = excel['Sheet1'];
+      sheet.appendRow([
+        xls.TextCellValue('Particulars / Account Head'),
+        xls.TextCellValue('Qty / Cr'),
+        xls.TextCellValue('Rate / Dr'),
+        xls.TextCellValue('Net Amount'),
+      ]);
+      for (int i = 0; i < _rows.length; i++) {
+        final txt = _rows[i]['item']!.text;
+        final q = double.tryParse(_rows[i]['qty']!.text) ?? 0.0;
+        final r = double.tryParse(_rows[i]['rate']!.text) ?? 0.0;
+        if (txt.isNotEmpty || (q * r) != 0) {
+          sheet.appendRow([
+            xls.TextCellValue(txt),
+            xls.DoubleCellValue(q),
+            xls.DoubleCellValue(r),
+            xls.DoubleCellValue(q * r),
+          ]);
+        }
+      }
+      sheet.appendRow([
+        xls.TextCellValue('GRAND TOTAL (Incl. GST $_gstPercent%)'),
+        xls.TextCellValue(''),
+        xls.TextCellValue(''),
+        xls.DoubleCellValue(_grandTotal()),
+      ]);
+      final encoded = excel.encode();
+      if (encoded != null) {
+        await widget.onSaveFile(Uint8List.fromList(encoded), '$baseName.xlsx');
+      }
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Saved $baseName.${asCsv ? "csv" : "xlsx"} to Vault!')),
+      );
+      Navigator.pop(context);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Excel & Accounting Ledger'),
+        actions: [
+          IconButton(
+            tooltip: 'Add Entry Row',
+            onPressed: () {
+              setState(() {
+                _rows.add({
+                  'item': TextEditingController(),
+                  'qty': TextEditingController(text: '1'),
+                  'rate': TextEditingController(text: '0.00'),
+                });
+              });
+            },
+            icon: const Icon(Icons.add_box_outlined),
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.save_alt),
+            onSelected: (v) => _saveSpreadsheet(asCsv: v == 'CSV'),
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'XLSX', child: Text('Export Excel (.xlsx)')),
+              PopupMenuItem(value: 'CSV', child: Text('Export Tally/Busy CSV (.csv)')),
+            ],
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: TextField(
+                    controller: _nameCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Ledger File Name',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _openingBalCtrl,
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => setState(() {}),
+                    decoration: const InputDecoration(
+                      labelText: 'Opening Bal (₹)',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  const Text('GST Slab: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                  for (final gst in [0.0, 5.0, 12.0, 18.0, 28.0])
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: ChoiceChip(
+                        label: Text('${gst.toInt()}%'),
+                        selected: _gstPercent == gst,
+                        onSelected: (_) => setState(() => _gstPercent = gst),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.all(12),
+              itemCount: _rows.length,
+              itemBuilder: (_, i) => Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: TextField(
+                          controller: _rows[i]['item'],
+                          decoration: InputDecoration(labelText: 'Item / Party #${i + 1}', isDense: true),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        flex: 2,
+                        child: TextField(
+                          controller: _rows[i]['qty'],
+                          keyboardType: TextInputType.number,
+                          onChanged: (_) => setState(() {}),
+                          decoration: const InputDecoration(labelText: 'Qty', isDense: true),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        flex: 2,
+                        child: TextField(
+                          controller: _rows[i]['rate'],
+                          keyboardType: TextInputType.number,
+                          onChanged: (_) => setState(() {}),
+                          decoration: const InputDecoration(labelText: 'Rate', isDense: true),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 74,
+                        child: Text(
+                          '₹${_rowTotal(i).toStringAsFixed(1)}',
+                          textAlign: TextAlign.right,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(16),
+            color: const Color(0xFF0F172A),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'NET LEDGER TOTAL (GST ${_gstPercent.toInt()}%)',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+                Text(
+                  '₹ ${_grandTotal().toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    color: Color(0xFFD4AF37),
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class SignatureAndStampStudio extends StatefulWidget {
+  final Future<void> Function(Uint8List pdfBytes, String name) onSaveSignedPdf;
+
+  const SignatureAndStampStudio({super.key, required this.onSaveSignedPdf});
+
+  @override
+  State<SignatureAndStampStudio> createState() => _SignatureAndStampStudioState();
+}
+
+class _SignatureAndStampStudioState extends State<SignatureAndStampStudio> {
+  final List<Offset?> _points = [];
+  final GlobalKey _boundaryKey = GlobalKey();
+  Color _inkColor = const Color(0xFF0F172A);
+  String _selectedStamp = 'APPROVED';
+
+  Future<void> _exportSignedDocument() async {
+    final boundary = _boundaryKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+    if (boundary == null) return;
+    final img = await boundary.toImage(pixelRatio: 3.0);
+    final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+    if (byteData == null) return;
+
+    final pngBytes = byteData.buffer.asUint8List();
+    final pdf = pw.Document();
+    final pwImg = pw.MemoryImage(pngBytes);
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (_) => pw.Center(
+          child: pw.Column(
+            mainAxisSize: pw.MainAxisSize.min,
+            children: [
+              pw.Container(
+                padding: const pw.EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(color: PdfColors.blue900, width: 2),
+                ),
+                child: pw.Text(
+                  'OFFICIAL STAMP: $_selectedStamp • AN OFFICE',
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.blue900),
+                ),
+              ),
+              pw.SizedBox(height: 20),
+              pw.Image(pwImg, width: 320),
+              pw.SizedBox(height: 10),
+              pw.Text(
+                'Digitally Signed on ${DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.now())}',
+                style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    await widget.onSaveSignedPdf(
+      await pdf.save(),
+      'Signed_${_selectedStamp}_${DateFormat('ddMMM_HHmm').format(DateTime.now())}',
+    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Signed & Stamped PDF Saved to Vault!')),
+      );
+      Navigator.pop(context);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Signature & Official Stamp Pad'),
+        actions: [
+          IconButton(
+            tooltip: 'Clear Pad',
+            onPressed: () => setState(() => _points.clear()),
+            icon: const Icon(Icons.delete_sweep_outlined),
+          ),
+          IconButton(
+            tooltip: 'Save Signed PDF',
+            onPressed: _exportSignedDocument,
+            icon: const Icon(Icons.check_circle_outline),
+          ),
+        ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  const Text('Official Stamp: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                  for (final st in ['APPROVED', 'VERIFIED', 'PAID', 'RECEIVED', 'CONFIDENTIAL'])
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: ChoiceChip(
+                        label: Text(st),
+                        selected: _selectedStamp == st,
+                        onSelected: (_) => setState(() => _selectedStamp = st),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text('Ink Color: '),
+                for (final c in [
+                  const Color(0xFF0F172A),
+                  const Color(0xFF1D4ED8),
+                  const Color(0xFFB91C1C),
+                  const Color(0xFF15803D),
+                ])
+                  GestureDetector(
+                    onTap: () => setState(() => _inkColor = c),
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 6),
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: c,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: _inkColor == c ? const Color(0xFFD4AF37) : Colors.transparent,
+                          width: 3,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: RepaintBoundary(
+                key: _boundaryKey,
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFF0F172A), width: 2),
+                  ),
+                  child: GestureDetector(
+                    onPanUpdate: (d) {
+                      final box = _boundaryKey.currentContext?.findRenderObject() as RenderBox?;
+                      if (box != null) {
+                        setState(() => _points.add(box.globalToLocal(d.globalPosition)));
+                      }
+                    },
+                    onPanEnd: (_) => _points.add(null),
+                    child: CustomPaint(
+                      painter: _InkPainter(_points, _inkColor),
+                      size: Size.infinite,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InkPainter extends CustomPainter {
+  final List<Offset?> points;
+  final Color color;
+  _InkPainter(this.points, this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 3.8;
+    for (int i = 0; i < points.length - 1; i++) {
+      if (points[i] != null && points[i + 1] != null) {
+        canvas.drawLine(points[i]!, points[i + 1]!, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
