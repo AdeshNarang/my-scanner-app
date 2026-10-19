@@ -1,7 +1,7 @@
 name: an_scan
-description: AN Scan - Executive Document Scanner, Acrobat Studio & Universal Format Converter by Adesh Narang.
+description: AN Scan - Executive Document Scanner & Acrobat Studio by Adesh Narang.
 publish_to: 'none'
-version: 9.0.0+25
+version: 9.1.0+26
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -10,24 +10,15 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # Offline AI Text & Document OCR (Latin & Devanagari)
   google_mlkit_text_recognition: ^0.13.0
-
-  # PDF Creation, Manipulation & Raster Rendering
   pdf: ^3.11.1
   printing: ^5.13.2
-
-  # Camera, Gallery, Image Matrix Manipulation & Compression
   image_picker: ^1.1.2
   flutter_image_compress: ^2.3.0
   image: ^4.2.0
-
-  # Office Document Engines (Excel .xlsx & Word .docx / Zip)
   excel: ^4.0.3
   archive: ^3.4.10
   xml: ^6.5.0
-
-  # Storage, Sharing, System Intents & Utilities
   path_provider: ^2.1.4
   path: ^1.9.0
   share_plus: ^10.0.2
