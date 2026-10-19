@@ -314,12 +314,12 @@ class GlobalSearchMatch {
 }
 
 /// Represents a freehand brush stroke painted with the Eyedropper-sampled background color
-classBlemishEraserStroke {
+BlemishEraserStroke {
   final List<Offset> normalizedPoints; // 0.0 - 1.0
   final Color sampledColor;
   final double strokeWidth;
 
-  classBlemishEraserStroke({
+  BlemishEraserStroke({
     required this.normalizedPoints,
     required this.sampledColor,
     required this.strokeWidth,
@@ -356,7 +356,7 @@ class EditableDocumentPage {
   ScanColorFilter activeFilter;
   List<OcrWordBox> ocrWords;
   List<PageAnnotationItem> annotations;
-  List<classBlemishEraserStroke> eraserStrokes;
+  List<BlemishEraserStroke> eraserStrokes;
 
   EditableDocumentPage({
     required this.originalBytes,
@@ -367,7 +367,7 @@ class EditableDocumentPage {
     this.activeFilter = ScanColorFilter.original,
     List<OcrWordBox>? ocrWords,
     List<PageAnnotationItem>? annotations,
-    List<classBlemishEraserStroke>? eraserStrokes,
+    List<BlemishEraserStroke>? eraserStrokes,
   })  : ocrWords = ocrWords ?? [],
         annotations = annotations ?? [],
         eraserStrokes = eraserStrokes ?? [];
@@ -3662,7 +3662,7 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                                       );
                                       setState(() {
                                         page.eraserStrokes.add(
-                                          classBlemishEraserStroke(
+                                          BlemishEraserStroke(
                                             normalizedPoints: [norm],
                                             sampledColor: _sampledPaperColor,
                                             strokeWidth: _eraserBrushSize,
@@ -3899,7 +3899,7 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
 }
 
 class _BlemishEraserCanvasPainter extends CustomPainter {
-  final List<classBlemishEraserStroke> strokes;
+  final List<BlemishEraserStroke> strokes;
   _BlemishEraserCanvasPainter({required this.strokes});
 
   @override
