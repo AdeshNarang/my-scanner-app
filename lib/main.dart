@@ -314,12 +314,12 @@ class GlobalSearchMatch {
 }
 
 /// Represents a freehand brush stroke painted with the Eyedropper-sampled background color
-class BlemishEraserStroke {
+classBlemishEraserStroke {
   final List<Offset> normalizedPoints; // 0.0 - 1.0
   final Color sampledColor;
   final double strokeWidth;
 
-  class BlemishEraserStroke({
+  classBlemishEraserStroke({
     required this.normalizedPoints,
     required this.sampledColor,
     required this.strokeWidth,
@@ -356,7 +356,7 @@ class EditableDocumentPage {
   ScanColorFilter activeFilter;
   List<OcrWordBox> ocrWords;
   List<PageAnnotationItem> annotations;
-  List<class BlemishEraserStroke> eraserStrokes;
+  List<classBlemishEraserStroke> eraserStrokes;
 
   EditableDocumentPage({
     required this.originalBytes,
@@ -367,7 +367,7 @@ class EditableDocumentPage {
     this.activeFilter = ScanColorFilter.original,
     List<OcrWordBox>? ocrWords,
     List<PageAnnotationItem>? annotations,
-    List<BlemishEraserStroke>? eraserStrokes,
+    List<classBlemishEraserStroke>? eraserStrokes,
   })  : ocrWords = ocrWords ?? [],
         annotations = annotations ?? [],
         eraserStrokes = eraserStrokes ?? [];
@@ -2426,7 +2426,7 @@ class _TruePdfReaderScreenState extends State<TruePdfReaderScreen> {
                                           ),
                                         );
                                       },
-                                      icon: const Icon(Icons.text_fields, size: 14, color: kBlueAccent),
+                                      icon: const Icon(Icons.text_Fields, size: 14, color: kBlueAccent),
                                       label: const Text('Select Text', style: TextStyle(fontSize: 11.5, color: kBlueAccent)),
                                     ),
                                   ],
@@ -3662,7 +3662,7 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                                       );
                                       setState(() {
                                         page.eraserStrokes.add(
-                                          BlemishEraserStroke(
+                                          classBlemishEraserStroke(
                                             normalizedPoints: [norm],
                                             sampledColor: _sampledPaperColor,
                                             strokeWidth: _eraserBrushSize,
@@ -3899,7 +3899,7 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
 }
 
 class _BlemishEraserCanvasPainter extends CustomPainter {
-  final List<class BlemishEraserStroke> strokes;
+  final List<classBlemishEraserStroke> strokes;
   _BlemishEraserCanvasPainter({required this.strokes});
 
   @override
