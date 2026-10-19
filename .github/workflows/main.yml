@@ -36,7 +36,7 @@ jobs:
           cp /tmp/pubspec.yaml pubspec.yaml
           cp /tmp/main.dart lib/main.dart
 
-      - name: Patch Gradle & ProGuard for SDK 35 + ML Kit Devanagari/Latin
+      - name: Patch Gradle & ProGuard for SDK 35 + ML Kit Latin/Devanagari
         run: |
           cat << 'EOF' > android/app/proguard-rules.pro
           -keep class com.google.mlkit.** { *; }
@@ -71,8 +71,8 @@ jobs:
                   applicationId = "in.adeshnarang.an_office"
                   minSdk = 24
                   targetSdk = 35
-                  versionCode = 7
-                  versionName = "3.4.0"
+                  versionCode = 9
+                  versionName = "4.0.0"
                   multiDexEnabled = true
               }
 
@@ -91,7 +91,7 @@ jobs:
           }
           EOF
 
-      - name: Configure AndroidManifest.xml (Scanner, Intents & File Viewer)
+      - name: Configure AndroidManifest.xml (Camera, Intents & File Viewer)
         run: |
           cat << 'EOF' > android/app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
