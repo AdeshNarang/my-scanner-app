@@ -57,7 +57,7 @@ jobs:
               draw = ImageDraw.Draw(base_img)
               ivory = (242, 239, 233, 255)
               charcoal = (45, 42, 38, 255)
-               pewter = (95, 90, 84, 255)
+              pewter = (95, 90, 84, 255)
 
               # Rounded Ivory Parchment Square
               draw.rounded_rectangle([14, 14, size-14, size-14], radius=98, fill=ivory, outline=pewter, width=5)
