@@ -1,4 +1,4 @@
-name: Build AN Scan Production APK
+name: Build AN Office Production APK
 
 on:
   workflow_dispatch:
@@ -33,7 +33,7 @@ jobs:
             cp assets/logo.png /tmp/user_logo.png
           fi
           rm -rf android ios test web linux macos windows pubspec.lock .dart_tool
-          flutter create --platforms=android --org com.adeshnarang --project-name an_scan .
+          flutter create --platforms=android --org com.adeshnarang --project-name an_office .
           mkdir -p assets
           cp /tmp/pubspec.yaml pubspec.yaml
           cp /tmp/main.dart lib/main.dart
@@ -41,7 +41,7 @@ jobs:
             cp /tmp/user_logo.png assets/logo.png
           fi
 
-      - name: Generate Classical AN Scan Logo & All Android Mipmaps
+      - name: Generate AN OFFICE Classical Crest Logo & Android Mipmaps
         run: |
           sudo apt-get update -y && sudo apt-get install -y python3-pil imagemagick
           python3 - << 'EOF'
@@ -55,58 +55,64 @@ jobs:
               size = 512
               base_img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
               draw = ImageDraw.Draw(base_img)
-              ivory = (245, 242, 235, 255)
-              bronze_dark = (58, 50, 42, 255)
-              bronze_mid = (110, 94, 77, 255)
-              gold_tint = (168, 142, 105, 255)
+              ivory = (242, 239, 233, 255)
+              charcoal = (45, 42, 38, 255)
+               pewter = (95, 90, 84, 255)
 
-              draw.rounded_rectangle([16, 16, size-16, size-16], radius=96, fill=ivory, outline=bronze_mid, width=6)
+              # Rounded Ivory Parchment Square
+              draw.rounded_rectangle([14, 14, size-14, size-14], radius=98, fill=ivory, outline=pewter, width=5)
+
+              # Double Filigree Circular Crest
               cx, cy = size // 2, size // 2
-              r_outer, r_inner = 205, 193
-              draw.ellipse([cx - r_outer, cy - r_outer, cx + r_outer, cy + r_outer], outline=bronze_dark, width=5)
-              draw.ellipse([cx - r_inner, cy - r_inner, cx + r_inner, cy + r_inner], outline=bronze_mid, width=3)
+              r_out, r_in = 208, 196
+              draw.ellipse([cx - r_out, cy - r_out, cx + r_out, cy + r_out], outline=charcoal, width=4)
+              draw.ellipse([cx - r_in, cy - r_in, cx + r_in, cy + r_in], outline=pewter, width=2)
 
-              for angle_pt in [(cx, cy - r_outer - 6), (cx, cy + r_outer + 6), (cx - r_outer - 6, cy), (cx + r_outer + 6, cy)]:
-                  ax, ay = angle_pt
-                  draw.ellipse([ax - 8, ay - 8, ax + 8, ay + 8], fill=bronze_dark, outline=gold_tint, width=2)
+              # Cardinal Filigree Nodes
+              for pt in [(cx, cy - r_out - 6), (cx, cy + r_out + 6), (cx - r_out - 6, cy), (cx + r_out + 6, cy)]:
+                  draw.ellipse([pt[0]-9, pt[1]-9, pt[0]+9, pt[1]+9], fill=charcoal)
 
               # Classical Interlocking 'A' and 'N' Monogram
-              draw.polygon([(175, 145), (120, 310), (146, 310), (188, 175)], fill=bronze_dark)
-              draw.polygon([(175, 145), (235, 310), (207, 310), (168, 175)], fill=bronze_dark)
-              draw.rectangle([140, 245, 212, 262], fill=bronze_mid)
-              draw.rectangle([108, 304, 156, 314], fill=bronze_dark)
-              draw.rectangle([196, 304, 246, 314], fill=bronze_dark)
-              draw.rectangle([156, 140, 194, 150], fill=bronze_dark)
+              draw.polygon([(176, 138), (118, 306), (146, 306), (190, 170)], fill=charcoal)
+              draw.polygon([(176, 138), (238, 306), (210, 306), (168, 170)], fill=charcoal)
+              draw.rectangle([138, 240, 212, 256], fill=pewter)
+              draw.rectangle([106, 300, 156, 310], fill=charcoal)
+              draw.rectangle([198, 300, 248, 310], fill=charcoal)
 
-              draw.rectangle([258, 155, 282, 312], fill=bronze_dark)
-              draw.polygon([(258, 155), (284, 155), (378, 290), (354, 312)], fill=bronze_dark)
-              draw.rectangle([356, 155, 378, 312], fill=bronze_dark)
-              draw.rectangle([244, 150, 294, 160], fill=bronze_dark)
-              draw.rectangle([342, 150, 392, 160], fill=bronze_dark)
-              draw.rectangle([244, 304, 296, 314], fill=bronze_dark)
+              draw.rectangle([258, 150, 282, 308], fill=charcoal)
+              draw.polygon([(258, 150), (284, 150), (380, 286), (356, 308)], fill=charcoal)
+              draw.rectangle([358, 150, 380, 308], fill=charcoal)
+              draw.rectangle([244, 145, 294, 155], fill=charcoal)
+              draw.rectangle([344, 145, 392, 155], fill=charcoal)
+              draw.rectangle([244, 300, 296, 310], fill=charcoal)
 
-              # Integrated Optical Magnifying Lens in Center
-              lx, ly, lr = 246, 250, 36
-              draw.ellipse([lx - lr - 6, ly - lr - 6, lx + lr + 6, ly + lr + 6], fill=bronze_dark, outline=gold_tint, width=3)
-              draw.ellipse([lx - lr + 4, ly - lr + 4, lx + lr - 4, ly + lr - 4], fill=ivory, outline=bronze_mid, width=3)
-              draw.polygon([(lx + 24, ly + 28), (lx + 36, ly + 18), (lx + 72, ly + 56), (lx + 58, ly + 68)], fill=bronze_dark)
+              # Center Magnifying Lens
+              lx, ly, lr = 248, 244, 34
+              draw.ellipse([lx - lr - 6, ly - lr - 6, lx + lr + 6, ly + lr + 6], fill=charcoal)
+              draw.ellipse([lx - lr + 4, ly - lr + 4, lx + lr - 4, ly + lr - 4], fill=ivory, outline=pewter, width=3)
+              draw.polygon([(lx + 22, ly + 26), (lx + 34, ly + 16), (lx + 70, ly + 52), (lx + 56, ly + 64)], fill=charcoal)
 
-              # 'SCAN' Footer
-              y_top = 345
-              draw.rectangle([170, y_top, 202, y_top+8], fill=bronze_dark)
-              draw.rectangle([170, y_top, 178, y_top+22], fill=bronze_dark)
-              draw.rectangle([170, y_top+18, 202, y_top+26], fill=bronze_dark)
-              draw.rectangle([194, y_top+18, 202, y_top+44], fill=bronze_dark)
-              draw.rectangle([170, y_top+36, 202, y_top+44], fill=bronze_dark)
-              draw.rectangle([218, y_top, 250, y_top+8], fill=bronze_dark)
-              draw.rectangle([218, y_top, 226, y_top+44], fill=bronze_dark)
-              draw.rectangle([218, y_top+36, 250, y_top+44], fill=bronze_dark)
-              draw.polygon([(278, y_top), (262, y_top+44), (271, y_top+44), (282, y_top+10)], fill=bronze_dark)
-              draw.polygon([(278, y_top), (296, y_top+44), (287, y_top+44), (276, y_top+10)], fill=bronze_dark)
-              draw.rectangle([267, y_top+26, 290, y_top+33], fill=bronze_dark)
-              draw.rectangle([310, y_top, 318, y_top+44], fill=bronze_dark)
-              draw.polygon([(310, y_top), (319, y_top), (344, y_top+36), (336, y_top+44)], fill=bronze_dark)
-              draw.rectangle([336, y_top, 344, y_top+44], fill=bronze_dark)
+              # 'OFFICE' Bold Serif Footer
+              y_top = 342
+              # O
+              draw.ellipse([142, y_top, 178, y_top+42], outline=charcoal, width=8)
+              # F
+              draw.rectangle([190, y_top, 198, y_top+42], fill=charcoal)
+              draw.rectangle([190, y_top, 218, y_top+8], fill=charcoal)
+              draw.rectangle([190, y_top+18, 212, y_top+25], fill=charcoal)
+              # F
+              draw.rectangle([228, y_top, 236, y_top+42], fill=charcoal)
+              draw.rectangle([228, y_top, 256, y_top+8], fill=charcoal)
+              draw.rectangle([228, y_top+18, 250, y_top+25], fill=charcoal)
+              # I
+              draw.rectangle([268, y_top, 276, y_top+42], fill=charcoal)
+              # C
+              draw.arc([290, y_top, 326, y_top+42], start=45, end=315, fill=charcoal, width=8)
+              # E
+              draw.rectangle([338, y_top, 346, y_top+42], fill=charcoal)
+              draw.rectangle([338, y_top, 368, y_top+8], fill=charcoal)
+              draw.rectangle([338, y_top+18, 362, y_top+25], fill=charcoal)
+              draw.rectangle([338, y_top+34, 368, y_top+42], fill=charcoal)
 
               base_img.save("assets/logo.png")
 
@@ -120,9 +126,9 @@ jobs:
       - name: Configure Native Kotlin Intent Interceptor
         run: |
           rm -rf android/app/src/main/kotlin/in
-          mkdir -p android/app/src/main/kotlin/com/adeshnarang/an_scan
-          cat << 'EOF' > android/app/src/main/kotlin/com/adeshnarang/an_scan/MainActivity.kt
-          package com.adeshnarang.an_scan
+          mkdir -p android/app/src/main/kotlin/com/adeshnarang/an_office
+          cat << 'EOF' > android/app/src/main/kotlin/com/adeshnarang/an_office/MainActivity.kt
+          package com.adeshnarang.an_office
 
           import android.content.Intent
           import android.net.Uri
@@ -135,7 +141,7 @@ jobs:
           import java.io.FileOutputStream
 
           class MainActivity: FlutterActivity() {
-              private val CHANNEL = "in.adeshnarang.an_scan/intent"
+              private val CHANNEL = "com.adeshnarang.an_office/intent"
               private var pendingFilePath: String? = null
               private var methodChannel: MethodChannel? = null
 
@@ -186,7 +192,7 @@ jobs:
 
               private fun copyUriToInternalCache(uri: Uri): String? {
                   return try {
-                      var fileName = "Imported_${System.currentTimeMillis()}.pdf"
+                      var fileName = "Document_${System.currentTimeMillis()}.pdf"
                       contentResolver.query(uri, null, null, null, null)?.use { cursor ->
                           val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                           if (nameIndex != -1 && cursor.moveToFirst()) {
@@ -212,10 +218,11 @@ jobs:
           }
           EOF
 
-      - name: Patch Gradle & ProGuard for SDK 35
+      - name: Patch Gradle & ProGuard for SDK 35 + ML Kit Document Scanner & Devanagari OCR
         run: |
           cat << 'EOF' > android/app/proguard-rules.pro
           -keep class com.google.mlkit.** { *; }
+          -keep class com.google.android.gms.** { *; }
           -dontwarn com.google.mlkit.**
           -dontwarn com.google.android.gms.**
           EOF
@@ -228,7 +235,7 @@ jobs:
           }
 
           android {
-              namespace = "com.adeshnarang.an_scan"
+              namespace = "com.adeshnarang.an_office"
               compileSdk = 35
               ndkVersion = flutter.ndkVersion
 
@@ -242,11 +249,11 @@ jobs:
               }
 
               defaultConfig {
-                  applicationId = "com.adeshnarang.an_scan"
+                  applicationId = "com.adeshnarang.an_office"
                   minSdk = 24
                   targetSdk = 35
-                  versionCode = 27
-                  versionName = "9.2.0"
+                  versionCode = 30
+                  versionName = "10.0.0"
                   multiDexEnabled = true
               }
 
@@ -260,12 +267,17 @@ jobs:
               }
           }
 
+          dependencies {
+              implementation "com.google.mlkit:text-recognition-devanagari:16.0.0"
+              implementation "com.google.android.gms:play-services-mlkit-document-scanner:16.0.0-beta1"
+          }
+
           flutter {
               source = "../.."
           }
           EOF
 
-      - name: Configure AndroidManifest.xml
+      - name: Configure AndroidManifest.xml for AN Office
         run: |
           cat << 'EOF' > android/app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
@@ -276,7 +288,7 @@ jobs:
               <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
 
               <application
-                  android:label="AN Scan"
+                  android:label="AN Office"
                   android:name="${applicationName}"
                   android:icon="@mipmap/ic_launcher"
                   android:requestLegacyExternalStorage="true"
@@ -308,6 +320,8 @@ jobs:
                           <data android:mimeType="text/plain" />
                           <data android:mimeType="text/csv" />
                           <data android:mimeType="image/*" />
+                          <data android:mimeType="application/msword" />
+                          <data android:mimeType="application/vnd.ms-excel" />
                           <data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
                           <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
                       </intent-filter>
@@ -337,8 +351,8 @@ jobs:
       - name: Compile Release APK
         run: flutter build apk --release --no-shrink
 
-      - name: Upload AN Scan Release APK
+      - name: Upload AN Office Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: AN-Scan-Release-APK
+          name: AN-Office-Release-APK
           path: build/app/outputs/flutter-apk/app-release.apk
