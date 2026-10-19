@@ -59,20 +59,16 @@ jobs:
               charcoal = (45, 42, 38, 255)
               pewter = (95, 90, 84, 255)
 
-              # Rounded Ivory Parchment Square
               draw.rounded_rectangle([14, 14, size-14, size-14], radius=98, fill=ivory, outline=pewter, width=5)
 
-              # Double Filigree Circular Crest
               cx, cy = size // 2, size // 2
               r_out, r_in = 208, 196
               draw.ellipse([cx - r_out, cy - r_out, cx + r_out, cy + r_out], outline=charcoal, width=4)
               draw.ellipse([cx - r_in, cy - r_in, cx + r_in, cy + r_in], outline=pewter, width=2)
 
-              # Cardinal Filigree Nodes
               for pt in [(cx, cy - r_out - 6), (cx, cy + r_out + 6), (cx - r_out - 6, cy), (cx + r_out + 6, cy)]:
                   draw.ellipse([pt[0]-9, pt[1]-9, pt[0]+9, pt[1]+9], fill=charcoal)
 
-              # Classical Interlocking 'A' and 'N' Monogram
               draw.polygon([(176, 138), (118, 306), (146, 306), (190, 170)], fill=charcoal)
               draw.polygon([(176, 138), (238, 306), (210, 306), (168, 170)], fill=charcoal)
               draw.rectangle([138, 240, 212, 256], fill=pewter)
@@ -86,29 +82,21 @@ jobs:
               draw.rectangle([344, 145, 392, 155], fill=charcoal)
               draw.rectangle([244, 300, 296, 310], fill=charcoal)
 
-              # Center Magnifying Lens
               lx, ly, lr = 248, 244, 34
               draw.ellipse([lx - lr - 6, ly - lr - 6, lx + lr + 6, ly + lr + 6], fill=charcoal)
               draw.ellipse([lx - lr + 4, ly - lr + 4, lx + lr - 4, ly + lr - 4], fill=ivory, outline=pewter, width=3)
               draw.polygon([(lx + 22, ly + 26), (lx + 34, ly + 16), (lx + 70, ly + 52), (lx + 56, ly + 64)], fill=charcoal)
 
-              # 'OFFICE' Bold Serif Footer
               y_top = 342
-              # O
               draw.ellipse([142, y_top, 178, y_top+42], outline=charcoal, width=8)
-              # F
               draw.rectangle([190, y_top, 198, y_top+42], fill=charcoal)
               draw.rectangle([190, y_top, 218, y_top+8], fill=charcoal)
               draw.rectangle([190, y_top+18, 212, y_top+25], fill=charcoal)
-              # F
               draw.rectangle([228, y_top, 236, y_top+42], fill=charcoal)
               draw.rectangle([228, y_top, 256, y_top+8], fill=charcoal)
               draw.rectangle([228, y_top+18, 250, y_top+25], fill=charcoal)
-              # I
               draw.rectangle([268, y_top, 276, y_top+42], fill=charcoal)
-              # C
               draw.arc([290, y_top, 326, y_top+42], start=45, end=315, fill=charcoal, width=8)
-              # E
               draw.rectangle([338, y_top, 346, y_top+42], fill=charcoal)
               draw.rectangle([338, y_top, 368, y_top+8], fill=charcoal)
               draw.rectangle([338, y_top+18, 362, y_top+25], fill=charcoal)
@@ -252,8 +240,8 @@ jobs:
                   applicationId = "com.adeshnarang.an_office"
                   minSdk = 24
                   targetSdk = 35
-                  versionCode = 30
-                  versionName = "10.0.0"
+                  versionCode = 31
+                  versionName = "10.0.1"
                   multiDexEnabled = true
               }
 
