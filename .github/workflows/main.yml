@@ -71,8 +71,8 @@ jobs:
                   applicationId = "in.adeshnarang.an_office"
                   minSdk = 24
                   targetSdk = 35
-                  versionCode = 4
-                  versionName = "3.1.0"
+                  versionCode = 5
+                  versionName = "3.2.0"
                   multiDexEnabled = true
               }
 
@@ -166,19 +166,16 @@ jobs:
 
           grid = [[navy for _ in range(w)] for _ in range(h)]
 
-          # Gold executive border
           for y in range(20, 236):
               for x in range(20, 236):
                   if x < 30 or x >= 226 or y < 30 or y >= 226:
                       grid[y][x] = gold
 
-          # Letter 'A' (left side)
           for y in range(75, 185):
               for x in range(55, 120):
                   if x < 70 or x >= 105 or (y < 90) or (122 <= y <= 136):
                       grid[y][x] = white if not (122 <= y <= 136) else gold
 
-          # Letter 'N' (right side)
           for y in range(75, 185):
               for x in range(136, 201):
                   diag = 136 + int((y - 75) * (50.0 / 110.0))
