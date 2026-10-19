@@ -24,16 +24,137 @@ jobs:
         with:
           channel: 'stable'
 
+      - name: Auto-Configure pubspec.yaml, AndroidManifest & Patch Code
+        run: |
+          # 1. Write verified pubspec.yaml (exact working dependencies from Run #13)
+          cat << 'EOF' > pubspec.yaml
+          name: an_office
+          description: "AN Office - Executive Document & Productivity Studio by Adesh Narang"
+          publish_to: 'none'
+          version: 2.0.0+1
+
+          environment:
+            sdk: '>=3.0.0 <4.0.0'
+
+          dependencies:
+            flutter:
+              sdk: flutter
+            google_mlkit_document_scanner: ^0.2.0
+            google_mlkit_text_recognition: ^0.13.0
+            image_picker: ^1.1.2
+            pdf: ^3.10.8
+            path_provider: ^2.1.3
+            open_file: ^3.3.2
+            share_plus: ^10.0.0
+            intl: ^0.19.0
+            image: ^4.2.0
+            archive: ^3.6.1
+            excel: ^4.0.3
+            url_launcher: ^6.3.0
+
+          dev_dependencies:
+            flutter_test:
+              sdk: flutter
+            flutter_lints: ^4.0.0
+
+          flutter:
+            uses-material-design: true
+          EOF
+
+          # 2. Patch lib/main.dart so it requires zero external file_picker plugins
+          python3 - << 'PYEOF'
+          with open('lib/main.dart', 'r') as f:
+              code = f.read()
+
+          code = code.replace('Icons.Auto_awesome_motion_outlined', 'Icons.folder_open_outlined')
+          code = code.replace("import 'package:file_picker/file_picker.dart';", "")
+
+          old_block = """      final result = await FilePicker.platform.pickFiles(
+                  type: FileType.custom,
+                  allowedExtensions: ['pdf', 'xlsx', 'xls', 'csv', 'docx', 'txt', 'jpg', 'jpeg', 'png'],
+                );
+                if (result == null || result.files.single.path == null) return;
+
+                final pickedFile = File(result.files.single.path!);
+                final ext = pickedFile.path.split('.').last.toLowerCase();
+                final baseName = result.files.single.name.replaceAll('.$ext', '');"""
+
+          new_block = """      final picked = await _picker.pickMedia();
+                if (picked == null) return;
+
+                final pickedFile = File(picked.path);
+                final ext = pickedFile.path.split('.').last.toLowerCase();
+                final baseName = picked.name.replaceAll('.$ext', '');"""
+
+          code = code.replace(old_block, new_block)
+
+          with open('lib/main.dart', 'w') as f:
+              f.write(code)
+          PYEOF
+
+          # 3. Update AndroidManifest.xml with AN Office label & default file handlers
+          cat << 'EOF' > android/app/src/main/AndroidManifest.xml
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.CAMERA" />
+              <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+              <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
+
+              <queries>
+                  <intent>
+                      <action android:name="android.intent.action.VIEW" />
+                      <data android:scheme="https" />
+                  </intent>
+              </queries>
+
+              <application
+                  android:label="AN Office"
+                  android:name="${applicationName}"
+                  android:icon="@mipmap/ic_launcher"
+                  android:requestLegacyExternalStorage="true">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:launchMode="singleTop"
+                      android:taskAffinity=""
+                      android:theme="@style/LaunchTheme"
+                      android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+                      android:hardwareAccelerated="true"
+                      android:windowSoftInputMode="adjustResize">
+                      <meta-data
+                        android:name="io.flutter.embedding.android.NormalTheme"
+                        android:resource="@style/NormalTheme" />
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
+                      </intent-filter>
+                      <intent-filter>
+                          <action android:name="android.intent.action.VIEW" />
+                          <category android:name="android.intent.category.DEFAULT" />
+                          <category android:name="android.intent.category.BROWSABLE" />
+                          <data android:scheme="file" />
+                          <data android:scheme="content" />
+                          <data android:mimeType="application/pdf" />
+                          <data android:mimeType="application/vnd.ms-excel" />
+                          <data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+                          <data android:mimeType="text/csv" />
+                          <data android:mimeType="application/msword" />
+                          <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+                          <data android:mimeType="text/plain" />
+                      </intent-filter>
+                  </activity>
+                  <meta-data
+                      android:name="flutterEmbedding"
+                      android:value="2" />
+              </application>
+          </manifest>
+          EOF
+
       - name: Install Dependencies
         run: flutter pub get
 
-      - name: Generate Classical AN Office Home Screen Icon & Configure Android
+      - name: Generate Classical AN Office Home Screen Icons Directly
         run: |
-          # 1. Safeguard any icon casing in main.dart
-          sed -i 's/Icons.Auto_awesome_motion_outlined/Icons.auto_awesome_motion_outlined/g' lib/main.dart
-
-          # 2. Generate 1024x1024 Classical Executive "AN Office" Home Screen Logo
-          cat << 'EOF' > generate_assets.dart
+          cat << 'EOF' > generate_icons.dart
           import 'dart:io';
           import 'package:image/image.dart' as img;
 
@@ -50,12 +171,12 @@ jobs:
             img.drawRect(canvas, x1: 64, y1: 64, x2: 960, y2: 960, color: tealBorder, thickness: 28);
             img.drawRect(canvas, x1: 104, y1: 104, x2: 920, y2: 920, color: brightTeal, thickness: 6);
 
-            // Draw Geometric "A" (Left Side)
+            // Draw Geometric "A"
             img.drawLine(canvas, x1: 335, y1: 260, x2: 200, y2: 720, color: brightTeal, thickness: 52);
             img.drawLine(canvas, x1: 335, y1: 260, x2: 470, y2: 720, color: brightTeal, thickness: 52);
             img.fillRect(canvas, x1: 245, y1: 530, x2: 425, y2: 580, color: brightTeal);
 
-            // Draw Geometric "N" (Right Side)
+            // Draw Geometric "N"
             img.fillRect(canvas, x1: 540, y1: 260, x2: 595, y2: 720, color: white);
             img.drawLine(canvas, x1: 565, y1: 275, x2: 795, y2: 705, color: white, thickness: 52);
             img.fillRect(canvas, x1: 765, y1: 260, x2: 820, y2: 720, color: white);
@@ -63,33 +184,30 @@ jobs:
             // Bottom Accent Bar
             img.fillRect(canvas, x1: 312, y1: 800, x2: 712, y2: 824, color: tealBorder);
 
-            File('app_icon.png').writeAsBytesSync(img.encodePng(canvas));
+            final mipmaps = {
+              'mipmap-mdpi': 48,
+              'mipmap-hdpi': 72,
+              'mipmap-xhdpi': 96,
+              'mipmap-xxhdpi': 144,
+              'mipmap-xxxhdpi': 192,
+            };
 
-            // 3. Rename Home Screen Label to "AN Office" in AndroidManifest.xml
-            final manifestFile = File('android/app/src/main/AndroidManifest.xml');
-            if (manifestFile.existsSync()) {
-              var content = manifestFile.readAsStringSync();
-              content = content.replaceAll(RegExp(r'android:label="[^"]*"'), 'android:label="AN Office"');
-              manifestFile.writeAsStringSync(content);
+            for (final entry in mipmaps.entries) {
+              final dir = Directory('android/app/src/main/res/${entry.key}');
+              if (!dir.existsSync()) dir.createSync(recursive: true);
+              final resized = img.copyResize(canvas, width: entry.value, height: entry.value);
+              File('${dir.path}/ic_launcher.png').writeAsBytesSync(img.encodePng(resized));
+            }
+
+            // Remove default adaptive XML override so Android displays our custom icon
+            final anyDpi = Directory('android/app/src/main/res/mipmap-anydpi-v26');
+            if (anyDpi.existsSync()) {
+              anyDpi.deleteSync(recursive: true);
             }
           }
           EOF
-          dart run generate_assets.dart
-          rm generate_assets.dart
-
-          # 4. Apply the Generated Icon to All Android Home Screen Resolutions
-          if ! grep -q "flutter_launcher_icons:" pubspec.yaml; then
-          cat << 'EOF' >> pubspec.yaml
-
-          flutter_launcher_icons:
-            android: true
-            ios: false
-            image_path: "app_icon.png"
-            adaptive_icon_background: "#0F172A"
-            adaptive_icon_foreground: "app_icon.png"
-          EOF
-          fi
-          dart run flutter_launcher_icons
+          dart run generate_icons.dart
+          rm generate_icons.dart
 
       - name: Build Release APK
         run: flutter build apk --release
