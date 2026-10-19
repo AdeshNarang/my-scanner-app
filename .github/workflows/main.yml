@@ -31,7 +31,7 @@ jobs:
         run: |
           cp pubspec.yaml /tmp/pubspec.yaml
           cp lib/main.dart /tmp/main.dart
-          rm -rf android ios test web linux macos windows
+          rm -rf android ios test web linux macos windows pubspec.lock .dart_tool
           flutter create --platforms=android --org in.adeshnarang --project-name an_office .
           cp /tmp/pubspec.yaml pubspec.yaml
           cp /tmp/main.dart lib/main.dart
@@ -71,8 +71,8 @@ jobs:
                   applicationId = "in.adeshnarang.an_office"
                   minSdk = 24
                   targetSdk = 35
-                  versionCode = 6
-                  versionName = "3.3.0"
+                  versionCode = 7
+                  versionName = "3.4.0"
                   multiDexEnabled = true
               }
 
@@ -193,8 +193,10 @@ jobs:
                   f.write(png)
           EOF
 
-      - name: Get Flutter Packages
-        run: flutter pub get
+      - name: Clean Build Cache & Get Packages
+        run: |
+          flutter clean
+          flutter pub get
 
       - name: Build Release APK (No R8 Shrink Crash)
         run: flutter build apk --release --no-shrink
