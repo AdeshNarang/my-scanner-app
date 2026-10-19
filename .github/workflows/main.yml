@@ -8,6 +8,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout Repository
@@ -16,117 +17,139 @@ jobs:
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: 'zulu'
           java-version: '17'
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.24.3'
           channel: 'stable'
+          cache: true
 
-      - name: Auto-Configure pubspec.yaml, AndroidManifest & Patch Code
+      - name: Create Missing Flutter Scaffold (if only 3 files exist in repo)
         run: |
-          # 1. Write verified pubspec.yaml (exact working dependencies from Run #13)
-          cat << 'EOF' > pubspec.yaml
-          name: an_office
-          description: "AN Office - Executive Document & Productivity Studio by Adesh Narang"
-          publish_to: 'none'
-          version: 2.0.0+1
+          if [ ! -d "android" ]; then
+            cp pubspec.yaml pubspec.yaml.bak
+            cp lib/main.dart lib/main.dart.bak
+            flutter create --org in.adeshnarang --project-name an_office .
+            mv pubspec.yaml.bak pubspec.yaml
+            mv lib/main.dart.bak lib/main.dart
+          fi
 
-          environment:
-            sdk: '>=3.0.0 <4.0.0'
-
-          dependencies:
-            flutter:
-              sdk: flutter
-            google_mlkit_document_scanner: ^0.2.0
-            google_mlkit_text_recognition: ^0.13.0
-            image_picker: ^1.1.2
-            pdf: ^3.10.8
-            path_provider: ^2.1.3
-            open_file: ^3.3.2
-            share_plus: ^10.0.0
-            intl: ^0.19.0
-            image: ^4.2.0
-            archive: ^3.6.1
-            excel: ^4.0.3
-            url_launcher: ^6.3.0
-
-          dev_dependencies:
-            flutter_test:
-              sdk: flutter
-            flutter_lints: ^4.0.0
-
-          flutter:
-            uses-material-design: true
+      - name: Generate Classic AN Monogram App Icon
+        run: |
+          mkdir -p assets
+          python3 - << 'EOF'
+          from PIL import Image, ImageDraw, ImageFont
+          img = Image.new('RGBA', (1024, 1024), (15, 23, 42, 255))
+          draw = ImageDraw.Draw(img)
+          # Gold/Executive Border
+          draw.rounded_rectangle([80, 80, 944, 944], radius=180, outline=(212, 175, 55, 255), width=28)
+          draw.rounded_rectangle([120, 120, 904, 904], radius=150, outline=(255, 255, 255, 60), width=8)
+          # Draw Clean Geometric "AN" Monogram
+          # Letter A
+          draw.polygon([(310, 720), (420, 300), (480, 300), (590, 720), (520, 720), (450, 420), (380, 720)], fill=(255, 255, 255, 255))
+          draw.rectangle([365, 560, 535, 610], fill=(212, 175, 55, 255))
+          # Letter N
+          draw.rectangle([620, 300, 685, 720], fill=(255, 255, 255, 255))
+          draw.polygon([(620, 300), (685, 300), (830, 720), (765, 720)], fill=(212, 175, 55, 255))
+          draw.rectangle([765, 300, 830, 720], fill=(255, 255, 255, 255))
+          img.save('assets/icon.png')
           EOF
 
-          # 2. Patch lib/main.dart so it requires zero external file_picker plugins
-          python3 - << 'PYEOF'
-          with open('lib/main.dart', 'r') as f:
-              code = f.read()
+      - name: Patch Android Build Config & ProGuard Rules (Fixes R8 & SDK Errors)
+        run: |
+          # 1. Create ProGuard rules to ignore missing ML Kit optional language modules
+          cat << 'EOF' > android/app/proguard-rules.pro
+          -keep class com.google.mlkit.** { *; }
+          -dontwarn com.google.mlkit.**
+          -dontwarn com.google.android.gms.**
+          -keep class androidx.lifecycle.** { *; }
+          EOF
 
-          code = code.replace('Icons.Auto_awesome_motion_outlined', 'Icons.folder_open_outlined')
-          code = code.replace("import 'package:file_picker/file_picker.dart';", "")
+          # 2. Force compileSdk 35, minSdk 24, MultiDex in android/app/build.gradle
+          cat << 'EOF' > android/app/build.gradle
+          plugins {
+              id "com.android.application"
+              id "kotlin-android"
+              id "dev.flutter.flutter-gradle-plugin"
+          }
 
-          old_block = """      final result = await FilePicker.platform.pickFiles(
-                  type: FileType.custom,
-                  allowedExtensions: ['pdf', 'xlsx', 'xls', 'csv', 'docx', 'txt', 'jpg', 'jpeg', 'png'],
-                );
-                if (result == null || result.files.single.path == null) return;
+          android {
+              namespace = "in.adeshnarang.an_office"
+              compileSdk = 35
+              ndkVersion = flutter.ndkVersion
 
-                final pickedFile = File(result.files.single.path!);
-                final ext = pickedFile.path.split('.').last.toLowerCase();
-                final baseName = result.files.single.name.replaceAll('.$ext', '');"""
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
 
-          new_block = """      final picked = await _picker.pickMedia();
-                if (picked == null) return;
+              kotlinOptions {
+                  jvmTarget = "17"
+              }
 
-                final pickedFile = File(picked.path);
-                final ext = pickedFile.path.split('.').last.toLowerCase();
-                final baseName = picked.name.replaceAll('.$ext', '');"""
+              defaultConfig {
+                  applicationId = "in.adeshnarang.an_office"
+                  minSdk = 24
+                  targetSdk = 35
+                  versionCode = 2
+                  versionName = "2.0.0"
+                  multiDexEnabled = true
+              }
 
-          code = code.replace(old_block, new_block)
+              buildTypes {
+                  release {
+                      signingConfig = signingConfigs.debug
+                      minifyEnabled = false
+                      shrinkResources = false
+                      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+                  }
+              }
+          }
 
-          with open('lib/main.dart', 'w') as f:
-              f.write(code)
-          PYEOF
+          flutter {
+              source = "../.."
+          }
+          EOF
 
-          # 3. Update AndroidManifest.xml with AN Office label & default file handlers
+      - name: Patch AndroidManifest.xml (Permissions, UCrop & File Viewer Intents)
+        run: |
           cat << 'EOF' > android/app/src/main/AndroidManifest.xml
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <uses-permission android:name="android.permission.CAMERA" />
-              <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-              <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+              xmlns:tools="http://schemas.android.com/tools">
 
-              <queries>
-                  <intent>
-                      <action android:name="android.intent.action.VIEW" />
-                      <data android:scheme="https" />
-                  </intent>
-              </queries>
+              <uses-permission android:name="android.permission.CAMERA"/>
+              <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
+              <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" tools:ignore="ScopedStorage"/>
 
               <application
                   android:label="AN Office"
                   android:name="${applicationName}"
                   android:icon="@mipmap/ic_launcher"
-                  android:requestLegacyExternalStorage="true">
+                  android:requestLegacyExternalStorage="true"
+                  android:enableOnBackInvokedCallback="true">
+
                   <activity
                       android:name=".MainActivity"
                       android:exported="true"
                       android:launchMode="singleTop"
-                      android:taskAffinity=""
                       android:theme="@style/LaunchTheme"
                       android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
                       android:hardwareAccelerated="true"
                       android:windowSoftInputMode="adjustResize">
+
                       <meta-data
-                        android:name="io.flutter.embedding.android.NormalTheme"
-                        android:resource="@style/NormalTheme" />
+                          android:name="io.flutter.embedding.android.NormalTheme"
+                          android:resource="@style/NormalTheme" />
+
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN"/>
                           <category android:name="android.intent.category.LAUNCHER"/>
                       </intent-filter>
+
+                      <!-- Native File Viewer Intent Filters (PDF, Word, Excel, Text) -->
                       <intent-filter>
                           <action android:name="android.intent.action.VIEW" />
                           <category android:name="android.intent.category.DEFAULT" />
@@ -134,14 +157,18 @@ jobs:
                           <data android:scheme="file" />
                           <data android:scheme="content" />
                           <data android:mimeType="application/pdf" />
-                          <data android:mimeType="application/vnd.ms-excel" />
-                          <data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
-                          <data android:mimeType="text/csv" />
-                          <data android:mimeType="application/msword" />
-                          <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
                           <data android:mimeType="text/plain" />
+                          <data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+                          <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
                       </intent-filter>
                   </activity>
+
+                  <!-- Required for Image Cropper -->
+                  <activity
+                      android:name="com.yalantis.ucrop.UCropActivity"
+                      android:screenOrientation="portrait"
+                      android:theme="@style/Theme.AppCompat.Light.NoActionBar"/>
+
                   <meta-data
                       android:name="flutterEmbedding"
                       android:value="2" />
@@ -149,70 +176,16 @@ jobs:
           </manifest>
           EOF
 
-      - name: Install Dependencies
-        run: flutter pub get
-
-      - name: Generate Classical AN Office Home Screen Icons Directly
+      - name: Install Dependencies & Generate Launcher Icons
         run: |
-          cat << 'EOF' > generate_icons.dart
-          import 'dart:io';
-          import 'package:image/image.dart' as img;
+          flutter pub get
+          dart run flutter_launcher_icons
 
-          void main() {
-            final canvas = img.Image(width: 1024, height: 1024);
-            final slateBg = img.ColorRgba8(15, 23, 42, 255);      // #0F172A Deep Executive Slate
-            final tealBorder = img.ColorRgba8(0, 128, 128, 255);  // #008080 Classic Teal
-            final brightTeal = img.ColorRgba8(45, 212, 191, 255); // #2DD4BF Monogram Accent
-            final white = img.ColorRgba8(248, 249, 253, 255);
+      - name: Build Release APK (Bypassing R8 Shrink Crash)
+        run: |
+          flutter build apk --release --no-shrink
 
-            img.fill(canvas, color: slateBg);
-
-            // Outer & Inner Classic Executive Frame
-            img.drawRect(canvas, x1: 64, y1: 64, x2: 960, y2: 960, color: tealBorder, thickness: 28);
-            img.drawRect(canvas, x1: 104, y1: 104, x2: 920, y2: 920, color: brightTeal, thickness: 6);
-
-            // Draw Geometric "A"
-            img.drawLine(canvas, x1: 335, y1: 260, x2: 200, y2: 720, color: brightTeal, thickness: 52);
-            img.drawLine(canvas, x1: 335, y1: 260, x2: 470, y2: 720, color: brightTeal, thickness: 52);
-            img.fillRect(canvas, x1: 245, y1: 530, x2: 425, y2: 580, color: brightTeal);
-
-            // Draw Geometric "N"
-            img.fillRect(canvas, x1: 540, y1: 260, x2: 595, y2: 720, color: white);
-            img.drawLine(canvas, x1: 565, y1: 275, x2: 795, y2: 705, color: white, thickness: 52);
-            img.fillRect(canvas, x1: 765, y1: 260, x2: 820, y2: 720, color: white);
-
-            // Bottom Accent Bar
-            img.fillRect(canvas, x1: 312, y1: 800, x2: 712, y2: 824, color: tealBorder);
-
-            final mipmaps = {
-              'mipmap-mdpi': 48,
-              'mipmap-hdpi': 72,
-              'mipmap-xhdpi': 96,
-              'mipmap-xxhdpi': 144,
-              'mipmap-xxxhdpi': 192,
-            };
-
-            for (final entry in mipmaps.entries) {
-              final dir = Directory('android/app/src/main/res/${entry.key}');
-              if (!dir.existsSync()) dir.createSync(recursive: true);
-              final resized = img.copyResize(canvas, width: entry.value, height: entry.value);
-              File('${dir.path}/ic_launcher.png').writeAsBytesSync(img.encodePng(resized));
-            }
-
-            // Remove default adaptive XML override so Android displays our custom icon
-            final anyDpi = Directory('android/app/src/main/res/mipmap-anydpi-v26');
-            if (anyDpi.existsSync()) {
-              anyDpi.deleteSync(recursive: true);
-            }
-          }
-          EOF
-          dart run generate_icons.dart
-          rm generate_icons.dart
-
-      - name: Build Release APK
-        run: flutter build apk --release
-
-      - name: Upload AN Office APK
+      - name: Upload AN Office APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: AN-Office-Release-APK
