@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -115,12 +117,65 @@ class ANOfficeLogoBadge extends StatelessWidget {
       child: Image.asset(
         'assets/logo.png',
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => const Center(
-          child: Text('AN', style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF2D2A26))),
+        errorBuilder: (_, __, ___) => CustomPaint(
+          size: Size(size, size),
+          painter: _ANOfficeCrestFallbackPainter(),
         ),
       ),
     );
   }
+}
+
+class _ANOfficeCrestFallbackPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final center = Offset(w / 2, h / 2);
+    canvas.drawRect(Rect.fromLTWH(0, 0, w, h), Paint()..color = const Color(0xFFF2EFE9));
+    canvas.drawCircle(
+      center,
+      w * 0.42,
+      Paint()
+        ..color = const Color(0xFF2D2A26)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = w * 0.025,
+    );
+
+    final tpAN = TextPainter(
+      text: TextSpan(
+        text: 'AN',
+        style: TextStyle(
+          fontFamily: 'serif',
+          fontSize: w * 0.35,
+          fontWeight: FontWeight.w900,
+          color: const Color(0xFF2D2A26),
+          letterSpacing: -1.2,
+          height: 1.0,
+        ),
+      ),
+      textDirection: ui.TextDirection.ltr,
+    )..layout();
+    tpAN.paint(canvas, Offset((w - tpAN.width) / 2, h * 0.17));
+
+    final tpOffice = TextPainter(
+      text: TextSpan(
+        text: 'OFFICE',
+        style: TextStyle(
+          fontFamily: 'serif',
+          fontSize: w * 0.13,
+          fontWeight: FontWeight.w800,
+          color: const Color(0xFF2D2A26),
+          letterSpacing: 1.2,
+        ),
+      ),
+      textDirection: ui.TextDirection.ltr,
+    )..layout();
+    tpOffice.paint(canvas, Offset((w - tpOffice.width) / 2, h * 0.64));
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class ANOfficeMasterShell extends StatefulWidget {
@@ -555,14 +610,26 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
         height: MediaQuery.of(context).size.height * 0.84,
-        decoration: const BoxDecoration(color: kWhitePure, borderRadius: BorderRadius.vertical(top: Radius.circular(26))),
+        decoration: const BoxDecoration(
+          color: kWhitePure,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+        ),
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(child: Container(width: 44, height: 5, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(4)))),
+            Center(
+              child: Container(
+                width: 44,
+                height: 5,
+                decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(4)),
+              ),
+            ),
             const SizedBox(height: 14),
-            const Text('Universal Format Converter Hub', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: kNavyPrimary)),
+            const Text(
+              'Universal Format Converter Hub',
+              style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: kNavyPrimary),
+            ),
             const Divider(height: 24),
             Expanded(
               child: GridView.count(
