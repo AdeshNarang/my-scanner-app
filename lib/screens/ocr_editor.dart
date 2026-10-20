@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_tesseract_ocr/flutter_tesseract_ocr.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
@@ -66,17 +67,43 @@ class _InPlaceSelectableOcrScreenState extends State<InPlaceSelectableOcrScreen>
     final tmpFile = File(p.join(tmpDir.path, 'inplace_ocr_tmp.png'));
     await tmpFile.writeAsBytes(_workingImageBytes);
 
-    final recognizer = UniversalFormatConverterEngine.createRecognizer(_lang);
+    final List<OcrWordBox> boxes = [];
+
     try {
-      final recognized = await recognizer.processImage(InputImage.fromFilePath(tmpFile.path));
-      final List<OcrWordBox> boxes = [];
-      for (final block in recognized.blocks) {
-        for (final line in block.lines) {
-          for (final element in line.elements) {
-            boxes.add(OcrWordBox(text: element.text, boundingBox: element.boundingBox));
+      if (_lang == OcrLanguageMode.punjabiGurmukhi) {
+        // Tesseract 4.0 LSTM with Punjabi 'pan' model & hOCR parsing
+        final hocr = await FlutterTesseractOcr.extractHocr(tmpFile.path, language: 'pan');
+        final reg = RegExp(
+          r"<span[^>]+class=['\"][^'\"]*ocrx_word[^'\"]*['\"][^>]+title=['\"][^'\"]*bbox\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)[^'\"]*['\"][^>]*>([^<]+)</span>",
+          caseSensitive: false,
+        );
+        for (final m in reg.allMatches(hocr)) {
+          final x1 = double.tryParse(m.group(1) ?? '0') ?? 0;
+          final y1 = double.tryParse(m.group(2) ?? '0') ?? 0;
+          final x2 = double.tryParse(m.group(3) ?? '0') ?? 0;
+          final y2 = double.tryParse(m.group(4) ?? '0') ?? 0;
+          final text = (m.group(5) ?? '').trim();
+          if (text.isNotEmpty) {
+            boxes.add(OcrWordBox(text: text, boundingBox: Rect.fromLTRB(x1, y1, x2, y2)));
           }
         }
+      } else {
+        // Google ML Kit for English (Latin) and Hindi (Devanagari)
+        final recognizer = UniversalFormatConverterEngine.createRecognizer(_lang);
+        try {
+          final recognized = await recognizer.processImage(InputImage.fromFilePath(tmpFile.path));
+          for (final block in recognized.blocks) {
+            for (final line in block.lines) {
+              for (final element in line.elements) {
+                boxes.add(OcrWordBox(text: element.text, boundingBox: element.boundingBox));
+              }
+            }
+          }
+        } finally {
+          await recognizer.close();
+        }
       }
+
       if (mounted) {
         setState(() {
           _wordBoxes = boxes;
@@ -86,8 +113,6 @@ class _InPlaceSelectableOcrScreenState extends State<InPlaceSelectableOcrScreen>
       }
     } catch (_) {
       if (mounted) setState(() => _runningOcr = false);
-    } finally {
-      await recognizer.close();
     }
   }
 
@@ -131,7 +156,6 @@ class _InPlaceSelectableOcrScreenState extends State<InPlaceSelectableOcrScreen>
       final bgPixel = decoded.getPixel(sampleX, sampleY);
       final paperColor = Color.fromARGB(255, bgPixel.r.toInt(), bgPixel.g.toInt(), bgPixel.b.toInt());
 
-      // Render the update directly onto GPU Canvas: inpaint background + paint new text
       final codec = await ui.instantiateImageCodec(_workingImageBytes);
       final frame = await codec.getNextFrame();
       final uiImg = frame.image;
