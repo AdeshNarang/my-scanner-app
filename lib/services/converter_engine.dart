@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:excel/excel.dart' as xls;
+import 'package:flutter_tesseract_ocr/flutter_tesseract_ocr.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -14,18 +15,11 @@ import 'package:xml/xml.dart' as xml;
 import '../models/document_models.dart';
 
 class UniversalFormatConverterEngine {
-  /// Dynamically selects the proper native OCR recognition script bundle
   static TextRecognizer createRecognizer(OcrLanguageMode mode) {
-    switch (mode) {
-      case OcrLanguageMode.hindiDevanagari:
-        return TextRecognizer(script: TextRecognitionScript.devanagari);
-      case OcrLanguageMode.punjabiGurmukhi:
-        // ML Kit lacks an on-device Gurmukhi model; Devanagari shares numeric & phonetic structures on bills
-        return TextRecognizer(script: TextRecognitionScript.devanagari);
-      case OcrLanguageMode.english:
-      default:
-        return TextRecognizer(script: TextRecognitionScript.latin);
+    if (mode == OcrLanguageMode.hindiDevanagari) {
+      return TextRecognizer(script: TextRecognitionScript.devanagari);
     }
+    return TextRecognizer(script: TextRecognitionScript.latin);
   }
 
   static Future<List<String>> extractLinesFromDocx(Uint8List docxBytes) async {
@@ -103,7 +97,6 @@ class UniversalFormatConverterEngine {
   static List<List<String>> extractRowsFromExcelOrCsv(Uint8List bytes, String ext) {
     final rawText = utf8.decode(bytes, allowMalformed: true);
 
-    // 1. Check if the file is an HTML table disguised as .XLS (standard Tally/Busy export)
     if (rawText.contains('<table') || rawText.contains('<TABLE')) {
       final List<List<String>> htmlRows = [];
       final rowMatches = RegExp(r'<tr[^>]*>(.*?)<\/tr>', caseSensitive: false, dotAll: true).allMatches(rawText);
@@ -121,7 +114,6 @@ class UniversalFormatConverterEngine {
       if (htmlRows.isNotEmpty) return htmlRows;
     }
 
-    // 2. Check if XML Spreadsheet 2003
     if (rawText.contains('<?xml') && rawText.contains('ss:Workbook')) {
       try {
         final doc = xml.XmlDocument.parse(rawText);
@@ -134,7 +126,6 @@ class UniversalFormatConverterEngine {
       } catch (_) {}
     }
 
-    // 3. Check CSV / TSV
     if (ext.toUpperCase() == 'CSV' || (!rawText.startsWith('PK') && rawText.contains('\n'))) {
       final lines = rawText.split('\n').where((l) => l.trim().isNotEmpty).toList();
       if (lines.length > 1) {
@@ -144,7 +135,6 @@ class UniversalFormatConverterEngine {
       }
     }
 
-    // 4. Decode with standard xls.Excel (.XLSX)
     try {
       final excel = xls.Excel.decodeBytes(bytes);
       final List<List<String>> rows = [];
@@ -157,7 +147,6 @@ class UniversalFormatConverterEngine {
       if (rows.isNotEmpty) return rows;
     } catch (_) {}
 
-    // 5. Binary BIFF string harvesting fallback for legacy .XLS
     final List<String> harvested = [];
     final matches = RegExp(r'[\x20-\x7E]{3,}').allMatches(rawText);
     for (final m in matches) {
@@ -192,26 +181,38 @@ class UniversalFormatConverterEngine {
   }
 
   static Future<List<String>> extractOcrLinesFromPdf(Uint8List pdfBytes, OcrLanguageMode lang) async {
-    final recognizer = createRecognizer(lang);
     final List<String> allLines = [];
     final tmpDir = await getTemporaryDirectory();
     int pageNum = 1;
 
-    try {
+    if (lang == OcrLanguageMode.punjabiGurmukhi) {
       await for (final page in Printing.raster(pdfBytes, dpi: 150)) {
         final png = await page.toPng();
-        final tmpFile = File(p.join(tmpDir.path, 'ocr_conv_$pageNum.png'));
+        final tmpFile = File(p.join(tmpDir.path, 'ocr_conv_pan_$pageNum.png'));
         await tmpFile.writeAsBytes(png);
-        final recognized = await recognizer.processImage(InputImage.fromFilePath(tmpFile.path));
-        for (final block in recognized.blocks) {
-          for (final line in block.lines) {
-            allLines.add(line.text);
-          }
-        }
+        final extracted = await FlutterTesseractOcr.extractText(tmpFile.path, language: 'pan');
+        final lines = extracted.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+        allLines.addAll(lines);
         pageNum++;
       }
-    } finally {
-      await recognizer.close();
+    } else {
+      final recognizer = createRecognizer(lang);
+      try {
+        await for (final page in Printing.raster(pdfBytes, dpi: 150)) {
+          final png = await page.toPng();
+          final tmpFile = File(p.join(tmpDir.path, 'ocr_conv_$pageNum.png'));
+          await tmpFile.writeAsBytes(png);
+          final recognized = await recognizer.processImage(InputImage.fromFilePath(tmpFile.path));
+          for (final block in recognized.blocks) {
+            for (final line in block.lines) {
+              allLines.add(line.text);
+            }
+          }
+          pageNum++;
+        }
+      } finally {
+        await recognizer.close();
+      }
     }
     return allLines.isEmpty ? ['Document Page Content'] : allLines;
   }
