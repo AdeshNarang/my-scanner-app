@@ -57,6 +57,7 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
   img.Image? _cachedDecodedCurrentPage;
 
   int? _selectedOverlayIdx;
+  int? _selectedAnnotationIdx;
 
   @override
   void initState() {
@@ -67,6 +68,29 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
   }
 
   EditableDocumentPage get _currentPage => _pages[_currentIndex];
+
+  Future<void> _applyFilterFastIsolate(ScanColorFilter filter) async {
+    final page = _currentPage;
+    if (filter == ScanColorFilter.original) {
+      setState(() {
+        page.activeFilter = filter;
+        page.displayBytes = page.originalBytes;
+        _cachedDecodedCurrentPage = null;
+      });
+      return;
+    }
+
+    setState(() => _processing = true);
+    final result = await compute(applyFilterInBackgroundIsolate, IsolateFilterPayload(page.originalBytes, filter.index));
+    if (mounted) {
+      setState(() {
+        page.activeFilter = filter;
+        page.displayBytes = result;
+        _cachedDecodedCurrentPage = null;
+        _processing = false;
+      });
+    }
+  }
 
   void _samplePixelColorLive(Offset normPos) {
     _cachedDecodedCurrentPage ??= img.decodeImage(_currentPage.displayBytes);
@@ -151,6 +175,118 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
     });
   }
 
+  Future<void> _openAddCustomTextDialog() async {
+    final txtCtrl = TextEditingController();
+    double chosenSize = 18.0;
+    Color chosenColor = kNavyPrimary;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModal) => AlertDialog(
+          title: const Text('Place Custom Text on Page', style: TextStyle(fontWeight: FontWeight.w900)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(controller: txtCtrl, autofocus: true, decoration: const InputDecoration(labelText: 'Enter Text', border: OutlineInputBorder())),
+              const SizedBox(height: 14),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Text Size:', style: TextStyle(fontWeight: FontWeight.bold)),
+                  Text('${chosenSize.round()} pt', style: const TextStyle(fontWeight: FontWeight.bold, color: kBlueAccent)),
+                ],
+              ),
+              Slider(value: chosenSize, min: 10, max: 44, activeColor: kBlueAccent, onChanged: (v) => setModal(() => chosenSize = v)),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: kBlueAccent),
+              onPressed: () {
+                if (txtCtrl.text.trim().isNotEmpty) {
+                  setState(() {
+                    _currentPage.annotations.add(
+                      PageAnnotationItem(type: 'text', text: txtCtrl.text.trim(), fontSize: chosenSize, color: chosenColor, normalizedPos: const Offset(0.45, 0.45)),
+                    );
+                    _selectedAnnotationIdx = _currentPage.annotations.length - 1;
+                  });
+                }
+                Navigator.pop(ctx);
+              },
+              child: const Text('Add Text'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openSignaturePadModal() async {
+    final List<Offset?> points = [];
+    final sigBytes = await showModalBottomSheet<Uint8List>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModal) => Container(
+          height: 350,
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Draw Ink Signature', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
+                  TextButton(onPressed: () => setModal(() => points.clear()), child: const Text('Clear')),
+                ],
+              ),
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(color: const Color(0xFFF1F5F9), border: Border.all(color: Colors.grey.shade400), borderRadius: BorderRadius.circular(12)),
+                  child: GestureDetector(
+                    onPanUpdate: (d) => setModal(() => points.add(d.localPosition)),
+                    onPanEnd: (_) => setModal(() => points.add(null)),
+                    child: CustomPaint(painter: _InkSignaturePainter(points: points), size: Size.infinite),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(backgroundColor: kBlueAccent),
+                  onPressed: () async {
+                    final recorder = ui.PictureRecorder();
+                    final canvas = Canvas(recorder);
+                    _InkSignaturePainter(points: points).paint(canvas, const Size(400, 180));
+                    final pic = recorder.endRecording();
+                    final uiImg = await pic.toImage(400, 180);
+                    final byteData = await uiImg.toByteData(format: ui.ImageByteFormat.png);
+                    if (ctx.mounted) Navigator.pop(ctx, byteData?.buffer.asUint8List());
+                  },
+                  icon: const Icon(Icons.check),
+                  label: const Text('Place Signature on Page'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (sigBytes != null) {
+      setState(() {
+        _currentPage.annotations.add(
+          PageAnnotationItem(type: 'signature', normalizedPos: const Offset(0.65, 0.80), signaturePng: sigBytes),
+        );
+      });
+    }
+  }
+
   Future<bool> _confirmExitWithoutSave() async {
     final shouldLeave = await showDialog<bool>(
       context: context,
@@ -217,6 +353,13 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                   );
                 }),
                 ...pItem.annotations.map((ann) {
+                  if (ann.type == 'signature' && ann.signaturePng != null) {
+                    return pw.Positioned(
+                      left: ann.normalizedPos.dx * pageW,
+                      top: ann.normalizedPos.dy * pageH,
+                      child: pw.Image(pw.MemoryImage(ann.signaturePng!), width: 130, height: 60),
+                    );
+                  }
                   return pw.Positioned(
                     left: ann.normalizedPos.dx * pageW,
                     top: ann.normalizedPos.dy * pageH,
@@ -304,6 +447,25 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                 ],
               ),
             ),
+            if (_brushEraserActive)
+              Container(
+                color: kBlueAccent.withOpacity(0.2),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                child: Row(
+                  children: [
+                    const Text('Eraser Size:', style: TextStyle(color: kWhitePure, fontSize: 12)),
+                    Expanded(
+                      child: Slider(value: _eraserBrushSize, min: 8, max: 55, activeColor: kBlueAccent, onChanged: (v) => setState(() => _eraserBrushSize = v)),
+                    ),
+                    IconButton(
+                      tooltip: 'Undo',
+                      icon: const Icon(Icons.undo, color: kWhitePure, size: 18),
+                      onPressed: _currentPage.eraserStrokes.isEmpty ? null : () => setState(() => _currentPage.eraserStrokes.removeLast()),
+                    ),
+                    TextButton(onPressed: () => setState(() => _brushEraserActive = false), child: const Text('Done', style: TextStyle(color: kBlueLight, fontWeight: FontWeight.bold))),
+                  ],
+                ),
+              ),
             Expanded(
               child: PageView.builder(
                 physics: (_brushEraserActive || _eyedropperSamplingMode || _selectedOverlayIdx != null) ? const NeverScrollableScrollPhysics() : const BouncingScrollPhysics(),
@@ -440,24 +602,112 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
               ),
             ),
             Container(
+              height: 44,
+              color: kNavySecondary,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                children: ScanColorFilter.values.map((f) {
+                  final selected = _currentPage.activeFilter == f;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: Text(f.label, style: const TextStyle(fontSize: 11.5)),
+                      selected: selected,
+                      selectedColor: kBlueLight,
+                      onSelected: (_) => _applyFilterFastIsolate(f),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            Container(
               color: kNavyPrimary,
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 14),
-              child: Row(
+              child: Column(
                 children: [
-                  Expanded(
-                    child: Slider(value: _quality.toDouble(), min: 20, max: 100, divisions: 8, activeColor: kBlueAccent, onChanged: (v) => setState(() => _quality = v.round())),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _studioActionBtn(icon: Icons.text_fields_rounded, label: 'Add Text', onTap: _openAddCustomTextDialog),
+                        _studioActionBtn(icon: Icons.brush_outlined, label: _brushEraserActive ? 'Eraser ON' : 'Color Eraser', isActive: _brushEraserActive, onTap: () => setState(() => _brushEraserActive = !_brushEraserActive)),
+                        _studioActionBtn(
+                          icon: Icons.crop_free,
+                          label: '8-Handle Crop',
+                          onTap: () async {
+                            final warped = await Navigator.push<Uint8List>(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => EightHandlePerspectiveCropScreen(imageBytes: _currentPage.originalBytes, pageTitle: '8-Handle Perspective Crop'),
+                              ),
+                            );
+                            if (warped != null) {
+                              setState(() {
+                                _currentPage.originalBytes = warped;
+                                _currentPage.displayBytes = warped;
+                                _cachedDecodedCurrentPage = null;
+                              });
+                            }
+                          },
+                        ),
+                        _studioActionBtn(
+                          icon: Icons.manage_search_rounded,
+                          label: 'OCR & Search',
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => InPlaceSelectableOcrScreen(
+                                imageBytes: _currentPage.displayBytes,
+                                imageWidth: _currentPage.imageWidth,
+                                imageHeight: _currentPage.imageHeight,
+                                initialLang: widget.ocrLang,
+                                onOcrCompleted: (words) => _currentPage.ocrWords = words,
+                              ),
+                            ),
+                          ),
+                        ),
+                        _studioActionBtn(icon: Icons.rotate_right, label: 'Rotate 90°', onTap: () => setState(() => _currentPage.rotationQuarterTurns = (_currentPage.rotationQuarterTurns + 1) % 4)),
+                        _studioActionBtn(icon: Icons.draw_outlined, label: 'Sign Ink', onTap: _openSignaturePadModal),
+                      ],
+                    ),
                   ),
-                  FilledButton.icon(
-                    style: FilledButton.styleFrom(backgroundColor: kBlueAccent, padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12)),
-                    onPressed: _processing ? null : _compileAndSaveFinalPdf,
-                    icon: const Icon(Icons.save_alt),
-                    label: const Text('Save PDF', style: TextStyle(fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Slider(value: _quality.toDouble(), min: 20, max: 100, divisions: 8, activeColor: kBlueAccent, onChanged: (v) => setState(() => _quality = v.round())),
+                      ),
+                      FilledButton.icon(
+                        style: FilledButton.styleFrom(backgroundColor: kBlueAccent, padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12)),
+                        onPressed: _processing ? null : _compileAndSaveFinalPdf,
+                        icon: const Icon(Icons.save_alt),
+                        label: const Text('Save PDF', style: TextStyle(fontWeight: FontWeight.w900)),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _studioActionBtn({required IconData icon, required String label, required VoidCallback onTap, bool isActive = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 10),
+      child: OutlinedButton.icon(
+        style: OutlinedButton.styleFrom(
+          backgroundColor: isActive ? kBlueAccent : Colors.transparent,
+          foregroundColor: kWhitePure,
+          side: BorderSide(color: isActive ? kBlueAccent : Colors.white24),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        ),
+        onPressed: onTap,
+        icon: Icon(icon, size: 17, color: isActive ? kWhitePure : kBlueLight),
+        label: Text(label, style: const TextStyle(fontSize: 12)),
       ),
     );
   }
@@ -497,4 +747,25 @@ class _BlemishEraserCanvasPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _BlemishEraserCanvasPainter oldDelegate) => true;
+}
+
+class _InkSignaturePainter extends CustomPainter {
+  final List<Offset?> points;
+  _InkSignaturePainter({required this.points});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = kNavyPrimary
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 3.2;
+    for (int i = 0; i < points.length - 1; i++) {
+      if (points[i] != null && points[i + 1] != null) {
+        canvas.drawLine(points[i]!, points[i + 1]!, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _InkSignaturePainter oldDelegate) => true;
 }
