@@ -342,14 +342,22 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
             margin: pw.EdgeInsets.zero,
             build: (_) => pw.Stack(
               children: [
-                pw.Positioned.fill(child: pw.Image(pw.MemoryImage(compressed), fit: pw.BoxFit.fill)),
+                pw.Positioned(
+                  left: 0,
+                  top: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: pw.Image(pw.MemoryImage(compressed), fit: pw.BoxFit.fill),
+                ),
                 ...pItem.overlayImages.map((ov) {
                   return pw.Positioned(
                     left: ov.normalizedPos.dx * pageW,
                     top: ov.normalizedPos.dy * pageH,
-                    width: ov.normalizedWidth * pageW,
-                    height: ov.normalizedHeight * pageH,
-                    child: pw.Image(pw.MemoryImage(ov.bytes), fit: pw.BoxFit.fill),
+                    child: pw.SizedBox(
+                      width: ov.normalizedWidth * pageW,
+                      height: ov.normalizedHeight * pageH,
+                      child: pw.Image(pw.MemoryImage(ov.bytes), fit: pw.BoxFit.fill),
+                    ),
                   );
                 }),
                 ...pItem.annotations.map((ann) {
@@ -363,7 +371,10 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                   return pw.Positioned(
                     left: ann.normalizedPos.dx * pageW,
                     top: ann.normalizedPos.dy * pageH,
-                    child: pw.Text(ann.text, style: pw.TextStyle(color: PdfColor.fromInt(ann.color.value), fontSize: ann.fontSize, fontWeight: pw.FontWeight.bold)),
+                    child: pw.Text(
+                      ann.text,
+                      style: pw.TextStyle(color: PdfColor.fromInt(ann.color.value), fontSize: ann.fontSize, fontWeight: pw.FontWeight.bold),
+                    ),
                   );
                 }),
               ],
@@ -532,8 +543,6 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                                       return Positioned(
                                         left: ov.normalizedPos.dx * boxW,
                                         top: ov.normalizedPos.dy * boxH,
-                                        width: ov.normalizedWidth * boxW,
-                                        height: ov.normalizedHeight * boxH,
                                         child: GestureDetector(
                                           onTap: () => setState(() => _selectedOverlayIdx = ovIdx),
                                           onPanUpdate: (d) => setState(() {
@@ -544,11 +553,11 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                                           }),
                                           child: Stack(
                                             children: [
-                                              Positioned.fill(
-                                                child: Container(
-                                                  decoration: isSel ? BoxDecoration(border: Border.all(color: kBlueAccent, width: 2.0)) : null,
-                                                  child: Image.memory(ov.bytes, fit: BoxFit.fill),
-                                                ),
+                                              Container(
+                                                width: ov.normalizedWidth * boxW,
+                                                height: ov.normalizedHeight * boxH,
+                                                decoration: isSel ? BoxDecoration(border: Border.all(color: kBlueAccent, width: 2.0)) : null,
+                                                child: Image.memory(ov.bytes, fit: BoxFit.fill),
                                               ),
                                               if (isSel)
                                                 Positioned(
