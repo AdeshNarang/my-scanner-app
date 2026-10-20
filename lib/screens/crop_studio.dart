@@ -49,60 +49,118 @@ class _EightHandlePerspectiveCropScreenState extends State<EightHandlePerspectiv
     if (mounted) setState(() => _decodedUiImage = frame.image);
   }
 
+  /// Multi-ray gradient consensus algorithm
+  /// Samples 7 vertical and 7 horizontal lines to find true document boundaries,
+  /// ignoring isolated dark/light patterns on textured sheets or wooden desks.
   Future<void> _detectDocumentEdgesSmart() async {
     final decoded = img.decodeImage(widget.imageBytes);
     if (decoded == null) return;
 
     final w = decoded.width;
     final h = decoded.height;
-    int minX = (w * 0.08).round();
-    int maxX = (w * 0.92).round();
-    int minY = (h * 0.08).round();
-    int maxY = (h * 0.92).round();
 
-    final centerPix = decoded.getPixel(w ~/ 2, h ~/ 2);
-    final centerLum = (centerPix.r + centerPix.g + centerPix.b) / 3.0;
+    final List<double> topCandidates = [];
+    final List<double> bottomCandidates = [];
+    final List<double> leftCandidates = [];
+    final List<double> rightCandidates = [];
 
-    for (int y = (h * 0.04).round(); y < (h * 0.40).round(); y += 4) {
-      final p = decoded.getPixel(w ~/ 2, y);
-      final lum = (p.r + p.g + p.b) / 3.0;
-      if ((lum - centerLum).abs() < 50) {
-        minY = y;
-        break;
+    // Sample across horizontal positions (20% to 80%) for top and bottom edges
+    for (double f = 0.20; f <= 0.80; f += 0.10) {
+      final x = (w * f).round().clamp(0, w - 1);
+
+      // Top edge scan: from 4% down to 45%
+      int bestTopY = (h * 0.08).round();
+      double maxGradTop = 0;
+      for (int y = (h * 0.04).round(); y < (h * 0.45).round(); y += 3) {
+        final p1 = decoded.getPixel(x, y);
+        final p2 = decoded.getPixel(x, y + 3);
+        final lum1 = (p1.r + p1.g + p1.b) / 3.0;
+        final lum2 = (p2.r + p2.g + p2.b) / 3.0;
+        final grad = (lum2 - lum1).abs();
+        if (grad > maxGradTop && grad > 25) {
+          maxGradTop = grad;
+          bestTopY = y;
+        }
       }
-    }
-    for (int y = (h * 0.96).round(); y > (h * 0.60).round(); y -= 4) {
-      final p = decoded.getPixel(w ~/ 2, y);
-      final lum = (p.r + p.g + p.b) / 3.0;
-      if ((lum - centerLum).abs() < 50) {
-        maxY = y;
-        break;
+      topCandidates.add(bestTopY.toDouble());
+
+      // Bottom edge scan: from 96% up to 55%
+      int bestBottomY = (h * 0.92).round();
+      double maxGradBottom = 0;
+      for (int y = (h * 0.96).round(); y > (h * 0.55).round(); y -= 3) {
+        final p1 = decoded.getPixel(x, y);
+        final p2 = decoded.getPixel(x, y - 3);
+        final lum1 = (p1.r + p1.g + p1.b) / 3.0;
+        final lum2 = (p2.r + p2.g + p2.b) / 3.0;
+        final grad = (lum2 - lum1).abs();
+        if (grad > maxGradBottom && grad > 25) {
+          maxGradBottom = grad;
+          bestBottomY = y;
+        }
       }
+      bottomCandidates.add(bestBottomY.toDouble());
     }
-    for (int x = (w * 0.04).round(); x < (w * 0.40).round(); x += 4) {
-      final p = decoded.getPixel(x, h ~/ 2);
-      final lum = (p.r + p.g + p.b) / 3.0;
-      if ((lum - centerLum).abs() < 50) {
-        minX = x;
-        break;
+
+    // Sample across vertical positions (20% to 80%) for left and right edges
+    for (double f = 0.20; f <= 0.80; f += 0.10) {
+      final y = (h * f).round().clamp(0, h - 1);
+
+      // Left edge scan: from 4% inward to 45%
+      int bestLeftX = (w * 0.08).round();
+      double maxGradLeft = 0;
+      for (int x = (w * 0.04).round(); x < (w * 0.45).round(); x += 3) {
+        final p1 = decoded.getPixel(x, y);
+        final p2 = decoded.getPixel(x + 3, y);
+        final lum1 = (p1.r + p1.g + p1.b) / 3.0;
+        final lum2 = (p2.r + p2.g + p2.b) / 3.0;
+        final grad = (lum2 - lum1).abs();
+        if (grad > maxGradLeft && grad > 25) {
+          maxGradLeft = grad;
+          bestLeftX = x;
+        }
       }
-    }
-    for (int x = (w * 0.96).round(); x > (w * 0.60).round(); x -= 4) {
-      final p = decoded.getPixel(x, h ~/ 2);
-      final lum = (p.r + p.g + p.b) / 3.0;
-      if ((lum - centerLum).abs() < 50) {
-        maxX = x;
-        break;
+      leftCandidates.add(bestLeftX.toDouble());
+
+      // Right edge scan: from 96% inward to 55%
+      int bestRightX = (w * 0.92).round();
+      double maxGradRight = 0;
+      for (int x = (w * 0.96).round(); x > (w * 0.55).round(); x -= 3) {
+        final p1 = decoded.getPixel(x, y);
+        final p2 = decoded.getPixel(x - 3, y);
+        final lum1 = (p1.r + p1.g + p1.b) / 3.0;
+        final lum2 = (p2.r + p2.g + p2.b) / 3.0;
+        final grad = (lum2 - lum1).abs();
+        if (grad > maxGradRight && grad > 25) {
+          maxGradRight = grad;
+          bestRightX = x;
+        }
       }
+      rightCandidates.add(bestRightX.toDouble());
     }
+
+    topCandidates.sort();
+    bottomCandidates.sort();
+    leftCandidates.sort();
+    rightCandidates.sort();
+
+    // Take median values to reject outliers from patterned backgrounds
+    final medianTop = topCandidates[topCandidates.length ~/ 2];
+    final medianBottom = bottomCandidates[bottomCandidates.length ~/ 2];
+    final medianLeft = leftCandidates[leftCandidates.length ~/ 2];
+    final medianRight = rightCandidates[rightCandidates.length ~/ 2];
+
+    final minX = (medianLeft / w).clamp(0.02, 0.40);
+    final maxX = (medianRight / w).clamp(0.60, 0.98);
+    final minY = (medianTop / h).clamp(0.02, 0.40);
+    final maxY = (medianBottom / h).clamp(0.60, 0.98);
 
     if (mounted) {
       setState(() {
         _corners = [
-          Offset(minX / w, minY / h),
-          Offset(maxX / w, minY / h),
-          Offset(maxX / w, maxY / h),
-          Offset(minX / w, maxY / h),
+          Offset(minX, minY),
+          Offset(maxX, minY),
+          Offset(maxX, maxY),
+          Offset(minX, maxY),
         ];
       });
     }
@@ -280,7 +338,11 @@ class _EightHandlePerspectiveCropScreenState extends State<EightHandlePerspectiv
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(foregroundColor: kWhitePure, side: const BorderSide(color: Colors.white38), padding: const EdgeInsets.symmetric(vertical: 14)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: kWhitePure,
+                        side: const BorderSide(color: Colors.white38),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
                       onPressed: () => Navigator.pop(context, widget.imageBytes),
                       child: const Text('Keep Original'),
                     ),
@@ -289,7 +351,11 @@ class _EightHandlePerspectiveCropScreenState extends State<EightHandlePerspectiv
                   Expanded(
                     flex: 2,
                     child: FilledButton.icon(
-                      style: FilledButton.styleFrom(backgroundColor: kBlueAccent, foregroundColor: kWhitePure, padding: const EdgeInsets.symmetric(vertical: 14)),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: kBlueAccent,
+                        foregroundColor: kWhitePure,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
                       onPressed: _processingWarp
                           ? null
                           : () async {
@@ -363,7 +429,10 @@ class _EightHandleCropGridPainter extends CustomPainter {
       ..lineTo(pts[3].dx, pts[3].dy)
       ..close();
 
-    canvas.drawPath(Path.combine(PathOperation.difference, Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height)), polyPath), Paint()..color = Colors.black.withOpacity(0.55));
+    canvas.drawPath(
+      Path.combine(PathOperation.difference, Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height)), polyPath),
+      Paint()..color = Colors.black.withOpacity(0.55),
+    );
     canvas.drawPath(polyPath, Paint()..color = kBlueAccent..style = PaintingStyle.stroke..strokeWidth = 2.8);
 
     for (int i = 0; i < 4; i++) {
