@@ -41,9 +41,20 @@ jobs:
             cp /tmp/user_logo.png assets/logo.png
           fi
 
-      - name: Generate AN OFFICE Classical Crest Logo & Android Mipmaps
+      - name: Generate Permanent Release Keystore & Print SHA-1 Fingerprint
         run: |
-          sudo apt-get update -y && sudo apt-get install -y python3-pil imagemagick
+          mkdir -p android/app
+          keytool -genkey -v -keystore android/app/release.keystore -alias anoffice -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass "anoffice123" -keypass "anoffice123" -dname "CN=Adesh Narang, OU=AN Office, O=AN Office, L=Moga, ST=Punjab, C=IN"
+          
+          echo "=========================================================="
+          echo "=== PERMANENT GOOGLE OAUTH SHA-1 CERTIFICATE FINGERPRINT ==="
+          keytool -list -v -keystore android/app/release.keystore -alias anoffice -storepass "anoffice123" | grep "SHA1:"
+          echo "=========================================================="
+
+      - name: Generate AN Office Classical Crest Logo & Mipmaps
+        run: |
+          sudo apt-get update -y && sudo apt-get install -y python3-pil
           python3 - << 'EOF'
           import os
           from PIL import Image, ImageDraw
@@ -60,7 +71,6 @@ jobs:
               pewter = (95, 90, 84, 255)
 
               draw.rounded_rectangle([14, 14, size-14, size-14], radius=98, fill=ivory, outline=pewter, width=5)
-
               cx, cy = size // 2, size // 2
               r_out, r_in = 208, 196
               draw.ellipse([cx - r_out, cy - r_out, cx + r_out, cy + r_out], outline=charcoal, width=4)
@@ -72,35 +82,10 @@ jobs:
               draw.polygon([(176, 138), (118, 306), (146, 306), (190, 170)], fill=charcoal)
               draw.polygon([(176, 138), (238, 306), (210, 306), (168, 170)], fill=charcoal)
               draw.rectangle([138, 240, 212, 256], fill=pewter)
-              draw.rectangle([106, 300, 156, 310], fill=charcoal)
-              draw.rectangle([198, 300, 248, 310], fill=charcoal)
 
               draw.rectangle([258, 150, 282, 308], fill=charcoal)
               draw.polygon([(258, 150), (284, 150), (380, 286), (356, 308)], fill=charcoal)
               draw.rectangle([358, 150, 380, 308], fill=charcoal)
-              draw.rectangle([244, 145, 294, 155], fill=charcoal)
-              draw.rectangle([344, 145, 392, 155], fill=charcoal)
-              draw.rectangle([244, 300, 296, 310], fill=charcoal)
-
-              lx, ly, lr = 248, 244, 34
-              draw.ellipse([lx - lr - 6, ly - lr - 6, lx + lr + 6, ly + lr + 6], fill=charcoal)
-              draw.ellipse([lx - lr + 4, ly - lr + 4, lx + lr - 4, ly + lr - 4], fill=ivory, outline=pewter, width=3)
-              draw.polygon([(lx + 22, ly + 26), (lx + 34, ly + 16), (lx + 70, ly + 52), (lx + 56, ly + 64)], fill=charcoal)
-
-              y_top = 342
-              draw.ellipse([142, y_top, 178, y_top+42], outline=charcoal, width=8)
-              draw.rectangle([190, y_top, 198, y_top+42], fill=charcoal)
-              draw.rectangle([190, y_top, 218, y_top+8], fill=charcoal)
-              draw.rectangle([190, y_top+18, 212, y_top+25], fill=charcoal)
-              draw.rectangle([228, y_top, 236, y_top+42], fill=charcoal)
-              draw.rectangle([228, y_top, 256, y_top+8], fill=charcoal)
-              draw.rectangle([228, y_top+18, 250, y_top+25], fill=charcoal)
-              draw.rectangle([268, y_top, 276, y_top+42], fill=charcoal)
-              draw.arc([290, y_top, 326, y_top+42], start=45, end=315, fill=charcoal, width=8)
-              draw.rectangle([338, y_top, 346, y_top+42], fill=charcoal)
-              draw.rectangle([338, y_top, 368, y_top+8], fill=charcoal)
-              draw.rectangle([338, y_top+18, 362, y_top+25], fill=charcoal)
-              draw.rectangle([338, y_top+34, 368, y_top+42], fill=charcoal)
 
               base_img.save("assets/logo.png")
 
@@ -111,7 +96,7 @@ jobs:
               base_img.resize((px, px), Image.Resampling.LANCZOS).save(f"{out_dir}/ic_launcher.png")
           EOF
 
-      - name: Configure Native Kotlin Intent Interceptor with Separate Task Stacking
+      - name: Configure Native Intent Interceptor
         run: |
           rm -rf android/app/src/main/kotlin/in
           mkdir -p android/app/src/main/kotlin/com/adeshnarang/an_office
@@ -206,7 +191,7 @@ jobs:
           }
           EOF
 
-      - name: Patch Gradle & ProGuard for SDK 35 + ML Kit Document Scanner & Devanagari OCR
+      - name: Configure Gradle Signing with Permanent Keystore
         run: |
           cat << 'EOF' > android/app/proguard-rules.pro
           -keep class com.google.mlkit.** { *; }
@@ -236,20 +221,29 @@ jobs:
                   jvmTarget = "17"
               }
 
+              signingConfigs {
+                  release {
+                      storeFile file('release.keystore')
+                      storePassword 'anoffice123'
+                      keyAlias 'anoffice'
+                      keyPassword 'anoffice123'
+                  }
+              }
+
               defaultConfig {
                   applicationId = "com.adeshnarang.an_office"
                   minSdk = 24
                   targetSdk = 35
-                  versionCode = 33
-                  versionName = "10.0.3"
+                  versionCode = 34
+                  versionName = "10.0.4"
                   multiDexEnabled = true
               }
 
               buildTypes {
                   release {
-                      signingConfig = signingConfigs.debug
-                      minifyEnabled = false
-                      shrinkResources = false
+                      signingConfig signingConfigs.release
+                      minifyEnabled false
+                      shrinkResources false
                       proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
                   }
               }
@@ -265,7 +259,7 @@ jobs:
           }
           EOF
 
-      - name: Configure AndroidManifest.xml (Document Launch Mode for Independent Recent Windows)
+      - name: Configure AndroidManifest.xml (intoExisting Single-Tab Stacking)
         run: |
           cat << 'EOF' > android/app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
@@ -286,7 +280,7 @@ jobs:
                       android:name=".MainActivity"
                       android:exported="true"
                       android:launchMode="singleTask"
-                      android:documentLaunchMode="always"
+                      android:documentLaunchMode="intoExisting"
                       android:theme="@style/LaunchTheme"
                       android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
                       android:hardwareAccelerated="true"
@@ -333,15 +327,13 @@ jobs:
           </manifest>
           EOF
 
-      - name: Clean Build Cache & Get Dependencies
+      - name: Clean & Compile Release APK
         run: |
           flutter clean
           flutter pub get
+          flutter build apk --release --no-shrink
 
-      - name: Compile Release APK
-        run: flutter build apk --release --no-shrink
-
-      - name: Upload AN Office Release APK
+      - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
           name: AN-Office-Release-APK
