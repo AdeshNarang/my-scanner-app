@@ -61,6 +61,13 @@ class _TruePdfReaderScreenState extends State<TruePdfReaderScreen> {
     _rasterizePdfForReader();
   }
 
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
   bool _isEncryptedPdf(Uint8List bytes) {
     final sampleLen = math.min(bytes.length, 4096);
     final headerAscii = String.fromCharCodes(bytes.sublist(0, sampleLen));
@@ -224,3 +231,170 @@ class _TruePdfReaderScreenState extends State<TruePdfReaderScreen> {
               )
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(widget.fileName, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.bold, color: kWhitePure), maxLines: 1),
+                  Text(
+                    _isEncrypted ? 'Password Protected' : '${_pages.length} Pages • Pinch to Zoom',
+                    style: const TextStyle(fontSize: 11, color: kBlueLight),
+                  ),
+                ],
+              ),
+        actions: [
+          IconButton(
+            icon: Icon(_showSearchBar ? Icons.close : Icons.search, color: kWhitePure),
+            onPressed: () => setState(() => _showSearchBar = !_showSearchBar),
+          ),
+          IconButton(
+            icon: const Icon(Icons.share_outlined, color: kWhitePure),
+            onPressed: () => Share.shareXFiles([XFile(widget.filePath)]),
+          ),
+          if (!_isEncrypted)
+            Padding(
+              padding: const EdgeInsets.only(right: 10),
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(backgroundColor: kBlueAccent),
+                onPressed: _pages.isEmpty ? null : _switchToFullEditorMode,
+                icon: const Icon(Icons.edit_note_rounded, size: 18),
+                label: const Text('Edit PDF', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+        ],
+      ),
+      body: _loadingPages
+          ? const Center(child: CircularProgressIndicator(color: kWhitePure))
+          : _isEncrypted
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Card(
+                      color: kNavySecondary,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      child: Padding(
+                        padding: const EdgeInsets.all(24.0),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.withOpacity(0.15),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.lock_rounded, size: 48, color: Colors.amber),
+                            ),
+                            const SizedBox(height: 18),
+                            const Text(
+                              'Password Protected Document',
+                              style: TextStyle(
+                                color: kWhitePure,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 10),
+                            const Text(
+                              'This PDF is encrypted. Tap below to securely unlock and view it using your phone’s system viewer.',
+                              style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.5),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 22),
+                            SizedBox(
+                              width: double.infinity,
+                              child: FilledButton.icon(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: kBlueAccent,
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                                onPressed: () => OpenFilex.open(widget.filePath),
+                                icon: const Icon(Icons.lock_open_rounded, size: 20),
+                                label: const Text(
+                                  'Unlock in Secure PDF Viewer',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+              : _errorMessage != null
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(28.0),
+                        child: Text(
+                          _errorMessage!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: kWhitePure, fontSize: 14),
+                        ),
+                      ),
+                    )
+                  : InteractiveViewer(
+                      minScale: 1.0,
+                      maxScale: 6.0,
+                      panEnabled: true,
+                      scaleEnabled: true,
+                      child: ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                        itemCount: _pages.length,
+                        itemBuilder: (_, i) {
+                          final page = _pages[i];
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            decoration: BoxDecoration(
+                              color: kWhitePure,
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 8, offset: Offset(0, 3))],
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: Column(
+                              children: [
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  color: kBlueIceBg,
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'Page ${i + 1} of ${_pages.length}',
+                                        style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: kNavyPrimary),
+                                      ),
+                                      TextButton.icon(
+                                        style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                                        onPressed: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => InPlaceSelectableOcrScreen(
+                                                imageBytes: page.displayBytes,
+                                                imageWidth: page.imageWidth,
+                                                imageHeight: page.imageHeight,
+                                                initialLang: widget.ocrLang,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                        icon: const Icon(Icons.text_fields, size: 14, color: kBlueAccent),
+                                        label: const Text('Select Text', style: TextStyle(fontSize: 11.5, color: kBlueAccent)),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                AspectRatio(
+                                  aspectRatio: page.imageWidth / math.max(1, page.imageHeight),
+                                  child: Image.memory(page.displayBytes, fit: BoxFit.fill),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+    );
+  }
+}
