@@ -111,7 +111,7 @@ jobs:
               base_img.resize((px, px), Image.Resampling.LANCZOS).save(f"{out_dir}/ic_launcher.png")
           EOF
 
-      - name: Configure Native Kotlin Intent Interceptor
+      - name: Configure Native Kotlin Intent Interceptor with Separate Task Stacking
         run: |
           rm -rf android/app/src/main/kotlin/in
           mkdir -p android/app/src/main/kotlin/com/adeshnarang/an_office
@@ -240,8 +240,8 @@ jobs:
                   applicationId = "com.adeshnarang.an_office"
                   minSdk = 24
                   targetSdk = 35
-                  versionCode = 32
-                  versionName = "10.0.2"
+                  versionCode = 33
+                  versionName = "10.0.3"
                   multiDexEnabled = true
               }
 
@@ -265,7 +265,7 @@ jobs:
           }
           EOF
 
-      - name: Configure AndroidManifest.xml for AN Office
+      - name: Configure AndroidManifest.xml (Document Launch Mode for Independent Recent Windows)
         run: |
           cat << 'EOF' > android/app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
@@ -285,7 +285,8 @@ jobs:
                   <activity
                       android:name=".MainActivity"
                       android:exported="true"
-                      android:launchMode="singleTop"
+                      android:launchMode="singleTask"
+                      android:documentLaunchMode="always"
                       android:theme="@style/LaunchTheme"
                       android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
                       android:hardwareAccelerated="true"
@@ -319,6 +320,7 @@ jobs:
                           <category android:name="android.intent.category.DEFAULT" />
                           <data android:mimeType="application/pdf" />
                           <data android:mimeType="image/*" />
+                          <data android:mimeType="application/vnd.ms-excel" />
                           <data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
                           <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
                       </intent-filter>
