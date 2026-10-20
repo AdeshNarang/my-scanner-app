@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
@@ -19,6 +20,7 @@ const Color kBlueAccent = Color(0xFF2563EB);
 const Color kBlueLight = Color(0xFFDBEAFE);
 const Color kBlueIceBg = Color(0xFFF1F5F9);
 const Color kWhitePure = Colors.white;
+const Color kSlateMuted = Color(0xFF64748B);
 
 class TruePdfReaderScreen extends StatefulWidget {
   final String filePath;
@@ -44,6 +46,8 @@ class _TruePdfReaderScreenState extends State<TruePdfReaderScreen> {
   final List<EditableDocumentPage> _pages = [];
   final ScrollController _scrollController = ScrollController();
   bool _loadingPages = true;
+  String? _errorMessage;
+  String? _currentPassword;
 
   bool _showSearchBar = false;
   final TextEditingController _searchCtrl = TextEditingController();
@@ -56,18 +60,93 @@ class _TruePdfReaderScreenState extends State<TruePdfReaderScreen> {
     _rasterizePdfForReader();
   }
 
-  Future<void> _rasterizePdfForReader() async {
+  bool _isEncryptedPdf(Uint8List bytes) {
+    final sampleLen = math.min(bytes.length, 4096);
+    final headerAscii = String.fromCharCodes(bytes.sublist(0, sampleLen));
+    final trailerStart = math.max(0, bytes.length - 4096);
+    final trailerAscii = String.fromCharCodes(bytes.sublist(trailerStart));
+    return headerAscii.contains('/Encrypt') || trailerAscii.contains('/Encrypt');
+  }
+
+  Future<String?> _promptPasswordDialog({bool isRetry = false}) async {
+    final ctrl = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.lock_outline, color: kBlueAccent),
+            const SizedBox(width: 10),
+            Text(isRetry ? 'Incorrect Password' : 'Password Protected PDF'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isRetry
+                  ? 'The password entered was incorrect. Please try again.'
+                  : 'This document is encrypted. Please enter the password to unlock it.',
+              style: const TextStyle(fontSize: 13, color: kSlateMuted),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: ctrl,
+              autofocus: true,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Document Password',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, null),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: kBlueAccent),
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Text('Unlock Document'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _rasterizePdfForReader({String? password}) async {
     setState(() {
       _loadingPages = true;
+      _errorMessage = null;
       _pages.clear();
     });
+
     try {
       final bytes = await File(widget.filePath).readAsBytes();
-      await for (final rasterPage in Printing.raster(bytes, dpi: 150)) {
-        final png = await rasterPage.toPng();
-        if (!mounted) return;
-        setState(() {
-          _pages.add(
+
+      if (password == null && _isEncryptedPdf(bytes)) {
+        final entered = await _promptPasswordDialog();
+        if (entered == null || entered.isEmpty) {
+          if (mounted) {
+            setState(() {
+              _loadingPages = false;
+              _errorMessage = 'Password required to open this protected document.';
+            });
+          }
+          return;
+        }
+        password = entered;
+      }
+
+      final List<EditableDocumentPage> loadedPages = [];
+      try {
+        await for (final rasterPage in Printing.raster(bytes, dpi: 150, password: password)) {
+          final png = await rasterPage.toPng();
+          loadedPages.add(
             EditableDocumentPage(
               originalBytes: png,
               displayBytes: png,
@@ -75,11 +154,36 @@ class _TruePdfReaderScreenState extends State<TruePdfReaderScreen> {
               imageHeight: rasterPage.height,
             ),
           );
+        }
+      } catch (_) {
+        final retryPassword = await _promptPasswordDialog(isRetry: true);
+        if (retryPassword != null && retryPassword.isNotEmpty) {
+          await _rasterizePdfForReader(password: retryPassword);
+          return;
+        } else {
+          if (mounted) {
+            setState(() {
+              _loadingPages = false;
+              _errorMessage = 'Failed to decrypt document. Incorrect password.';
+            });
+          }
+          return;
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _currentPassword = password;
+        _pages.addAll(loadedPages);
+        _loadingPages = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
           _loadingPages = false;
+          _errorMessage = 'Error loading document: $e';
         });
       }
-    } catch (_) {
-      if (mounted) setState(() => _loadingPages = false);
     }
   }
 
@@ -128,108 +232,3 @@ class _TruePdfReaderScreenState extends State<TruePdfReaderScreen> {
         _searchMatches = found;
         if (found.isNotEmpty) _jumpToSearchMatch(found.first);
       });
-    }
-  }
-
-  void _jumpToSearchMatch(GlobalSearchMatch match) {
-    setState(() => _highlightedMatch = match);
-    final estimatedOffset = match.pageIndex * 480.0;
-    _scrollController.animateTo(
-      estimatedOffset.clamp(0.0, _scrollController.position.maxScrollExtent),
-      duration: const Duration(milliseconds: 350),
-      curve: Curves.easeOutCubic,
-    );
-  }
-
-  Future<void> _switchToFullEditorMode() async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => AcrobatDocumentStudioScreen(
-          initialPages: _pages,
-          initialTitle: widget.fileName.replaceAll(RegExp(r'\.pdf$', caseSensitive: false), ''),
-          defaultQuality: widget.defaultQuality,
-          ocrLang: widget.ocrLang,
-          onSaveDocument: (updatedBytes, finalName) async {
-            await File(widget.filePath).writeAsBytes(updatedBytes);
-            widget.onFileUpdated();
-          },
-        ),
-      ),
-    );
-    await _rasterizePdfForReader();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF334155),
-      appBar: AppBar(
-        backgroundColor: kNavyPrimary,
-        title: _showSearchBar
-            ? TextField(
-                controller: _searchCtrl,
-                autofocus: true,
-                style: const TextStyle(color: kWhitePure, fontSize: 15),
-                decoration: const InputDecoration(hintText: 'Search word across all pages...', hintStyle: TextStyle(color: Colors.white60), border: InputBorder.none),
-                onSubmitted: _runGlobalDocumentSearch,
-              )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(widget.fileName, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.bold, color: kWhitePure), maxLines: 1),
-                  Text('${_pages.length} Pages • Pinch to Zoom', style: const TextStyle(fontSize: 11, color: kBlueLight)),
-                ],
-              ),
-        actions: [
-          IconButton(icon: Icon(_showSearchBar ? Icons.close : Icons.search, color: kWhitePure), onPressed: () => setState(() => _showSearchBar = !_showSearchBar)),
-          IconButton(icon: const Icon(Icons.share_outlined, color: kWhitePure), onPressed: () => Share.shareXFiles([XFile(widget.filePath)])),
-          Padding(
-            padding: const EdgeInsets.only(right: 10),
-            child: FilledButton.icon(
-              style: FilledButton.styleFrom(backgroundColor: kBlueAccent),
-              onPressed: _pages.isEmpty ? null : _switchToFullEditorMode,
-              icon: const Icon(Icons.edit_note_rounded, size: 18),
-              label: const Text('Edit PDF', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ),
-        ],
-      ),
-      body: _loadingPages && _pages.isEmpty
-          ? const Center(child: CircularProgressIndicator(color: kWhitePure))
-          : InteractiveViewer(
-              minScale: 1.0,
-              maxScale: 5.0,
-              panEnabled: true,
-              scaleEnabled: true,
-              child: ListView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                itemCount: _pages.length,
-                itemBuilder: (_, i) {
-                  final page = _pages[i];
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    decoration: BoxDecoration(color: kWhitePure, borderRadius: BorderRadius.circular(8), boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 8, offset: Offset(0, 3))]),
-                    clipBehavior: Clip.antiAlias,
-                    child: Column(
-                      children: [
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          color: kBlueIceBg,
-                          child: Text('Page ${i + 1} of ${_pages.length}', style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: kNavyPrimary)),
-                        ),
-                        AspectRatio(
-                          aspectRatio: page.imageWidth / math.max(1, page.imageHeight),
-                          child: Image.memory(page.displayBytes, fit: BoxFit.fill),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-    );
-  }
-}
