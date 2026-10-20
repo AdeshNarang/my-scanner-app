@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -102,7 +103,11 @@ class _InPlaceSelectableOcrScreenState extends State<InPlaceSelectableOcrScreen>
           children: [
             Text('Original Text: "${wb.text}"', style: const TextStyle(fontSize: 12, color: Colors.grey)),
             const SizedBox(height: 12),
-            TextField(controller: editCtrl, autofocus: true, decoration: const InputDecoration(labelText: 'New In-Photo Text', border: OutlineInputBorder())),
+            TextField(
+              controller: editCtrl,
+              autofocus: true,
+              decoration: const InputDecoration(labelText: 'New In-Photo Text', border: OutlineInputBorder()),
+            ),
           ],
         ),
         actions: [
@@ -124,20 +129,42 @@ class _InPlaceSelectableOcrScreenState extends State<InPlaceSelectableOcrScreen>
       final sampleX = (r.left - 4).clamp(0, decoded.width - 1).toInt();
       final sampleY = (r.top - 4).clamp(0, decoded.height - 1).toInt();
       final bgPixel = decoded.getPixel(sampleX, sampleY);
+      final paperColor = Color.fromARGB(255, bgPixel.r.toInt(), bgPixel.g.toInt(), bgPixel.b.toInt());
 
-      // Inpaint/erase original text with paper texture
-      img.fillRect(
-        decoded,
-        x1: r.left.toInt() - 2,
-        y1: r.top.toInt() - 2,
-        x2: r.right.toInt() + 2,
-        y2: r.bottom.toInt() + 2,
-        color: bgPixel,
-      );
+      // Render the update directly onto GPU Canvas: inpaint background + paint new text
+      final codec = await ui.instantiateImageCodec(_workingImageBytes);
+      final frame = await codec.getNextFrame();
+      final uiImg = frame.image;
 
-      final updatedBytes = Uint8List.fromList(img.encodeJpg(decoded, quality: 95));
-      setState(() => _workingImageBytes = updatedBytes);
-      await _performInPlaceOcr();
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, uiImg.width.toDouble(), uiImg.height.toDouble()));
+
+      canvas.drawImage(uiImg, Offset.zero, Paint());
+      canvas.drawRect(r.inflate(3.0), Paint()..color = paperColor..style = PaintingStyle.fill);
+
+      final fontSize = (r.height * 0.82).clamp(12.0, 90.0);
+      final tp = TextPainter(
+        text: TextSpan(
+          text: confirmedNewText,
+          style: TextStyle(
+            color: kNavyPrimary,
+            fontSize: fontSize,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout(maxWidth: r.width * 3.0);
+
+      tp.paint(canvas, Offset(r.left, r.top + (r.height - tp.height) / 2));
+
+      final pic = recorder.endRecording();
+      final renderedImg = await pic.toImage(uiImg.width, uiImg.height);
+      final byteData = await renderedImg.toByteData(format: ui.ImageByteFormat.png);
+
+      if (byteData != null) {
+        setState(() => _workingImageBytes = byteData.buffer.asUint8List());
+        await _performInPlaceOcr();
+      }
     }
   }
 
