@@ -14,8 +14,18 @@ import 'package:xml/xml.dart' as xml;
 import '../models/document_models.dart';
 
 class UniversalFormatConverterEngine {
+  /// Dynamically selects the proper native OCR recognition script bundle
   static TextRecognizer createRecognizer(OcrLanguageMode mode) {
-    return TextRecognizer(script: TextRecognitionScript.latin);
+    switch (mode) {
+      case OcrLanguageMode.hindiDevanagari:
+        return TextRecognizer(script: TextRecognitionScript.devanagari);
+      case OcrLanguageMode.punjabiGurmukhi:
+        // ML Kit lacks an on-device Gurmukhi model; Devanagari shares numeric & phonetic structures on bills
+        return TextRecognizer(script: TextRecognitionScript.devanagari);
+      case OcrLanguageMode.english:
+      default:
+        return TextRecognizer(script: TextRecognitionScript.latin);
+    }
   }
 
   static Future<List<String>> extractLinesFromDocx(Uint8List docxBytes) async {
