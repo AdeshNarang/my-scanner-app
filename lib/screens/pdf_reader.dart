@@ -187,6 +187,18 @@ class _TruePdfReaderScreenState extends State<TruePdfReaderScreen> {
     }
   }
 
+  void _scrollToMatch(GlobalSearchMatch match) {
+    setState(() => _highlightedMatch = match);
+    if (_scrollController.hasClients) {
+      final estimatedOffset = match.pageIndex * 480.0;
+      _scrollController.animateTo(
+        estimatedOffset.clamp(0.0, _scrollController.position.maxScrollExtent),
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
   Future<void> _runGlobalDocumentSearch(String query) async {
     final cleanQuery = query.trim().toLowerCase();
     if (cleanQuery.isEmpty) {
@@ -230,5 +242,167 @@ class _TruePdfReaderScreenState extends State<TruePdfReaderScreen> {
     if (mounted) {
       setState(() {
         _searchMatches = found;
-        if (found.isNotEmpty) _jumpToSearchMatch(found.first);
+        if (found.isNotEmpty) {
+          _scrollToMatch(found.first);
+        }
       });
+    }
+  }
+
+  Future<void> _switchToFullEditorMode() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AcrobatDocumentStudioScreen(
+          initialPages: _pages,
+          initialTitle: widget.fileName.replaceAll(RegExp(r'\.pdf$', caseSensitive: false), ''),
+          defaultQuality: widget.defaultQuality,
+          ocrLang: widget.ocrLang,
+          onSaveDocument: (updatedBytes, finalName) async {
+            await File(widget.filePath).writeAsBytes(updatedBytes);
+            widget.onFileUpdated();
+          },
+        ),
+      ),
+    );
+    await _rasterizePdfForReader(password: _currentPassword);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF334155),
+      appBar: AppBar(
+        backgroundColor: kNavyPrimary,
+        title: _showSearchBar
+            ? TextField(
+                controller: _searchCtrl,
+                autofocus: true,
+                style: const TextStyle(color: kWhitePure, fontSize: 15),
+                decoration: const InputDecoration(
+                  hintText: 'Search word across all pages...',
+                  hintStyle: TextStyle(color: Colors.white60),
+                  border: InputBorder.none,
+                ),
+                onSubmitted: _runGlobalDocumentSearch,
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(widget.fileName, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.bold, color: kWhitePure), maxLines: 1),
+                  Text('${_pages.length} Pages • Pinch to Zoom', style: const TextStyle(fontSize: 11, color: kBlueLight)),
+                ],
+              ),
+        actions: [
+          IconButton(
+            icon: Icon(_showSearchBar ? Icons.close : Icons.search, color: kWhitePure),
+            onPressed: () => setState(() => _showSearchBar = !_showSearchBar),
+          ),
+          IconButton(
+            icon: const Icon(Icons.share_outlined, color: kWhitePure),
+            onPressed: () => Share.shareXFiles([XFile(widget.filePath)]),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: FilledButton.icon(
+              style: FilledButton.styleFrom(backgroundColor: kBlueAccent),
+              onPressed: _pages.isEmpty ? null : _switchToFullEditorMode,
+              icon: const Icon(Icons.edit_note_rounded, size: 18),
+              label: const Text('Edit PDF', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+      ),
+      body: _loadingPages
+          ? const Center(child: CircularProgressIndicator(color: kWhitePure))
+          : _errorMessage != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(28.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.lock_person_outlined, size: 54, color: Colors.amberAccent),
+                        const SizedBox(height: 14),
+                        Text(
+                          _errorMessage!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: kWhitePure, fontSize: 14, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 18),
+                        FilledButton.icon(
+                          style: FilledButton.styleFrom(backgroundColor: kBlueAccent),
+                          onPressed: () => _rasterizePdfForReader(),
+                          icon: const Icon(Icons.key_rounded, size: 18),
+                          label: const Text('Unlock with Password'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : InteractiveViewer(
+                  minScale: 1.0,
+                  maxScale: 6.0,
+                  panEnabled: true,
+                  scaleEnabled: true,
+                  child: ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                    itemCount: _pages.length,
+                    itemBuilder: (_, i) {
+                      final page = _pages[i];
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: kWhitePure,
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 8, offset: Offset(0, 3))],
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: Column(
+                          children: [
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              color: kBlueIceBg,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Page ${i + 1} of ${_pages.length}',
+                                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: kNavyPrimary),
+                                  ),
+                                  TextButton.icon(
+                                    style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => InPlaceSelectableOcrScreen(
+                                            imageBytes: page.displayBytes,
+                                            imageWidth: page.imageWidth,
+                                            imageHeight: page.imageHeight,
+                                            initialLang: widget.ocrLang,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    icon: const Icon(Icons.text_fields, size: 14, color: kBlueAccent),
+                                    label: const Text('Select Text', style: TextStyle(fontSize: 11.5, color: kBlueAccent)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            AspectRatio(
+                              aspectRatio: page.imageWidth / math.max(1, page.imageHeight),
+                              child: Image.memory(page.displayBytes, fit: BoxFit.fill),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+    );
+  }
+}
