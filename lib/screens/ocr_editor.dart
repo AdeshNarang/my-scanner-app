@@ -71,10 +71,9 @@ class _InPlaceSelectableOcrScreenState extends State<InPlaceSelectableOcrScreen>
 
     try {
       if (_lang == OcrLanguageMode.punjabiGurmukhi) {
-        // Tesseract 4.0 LSTM with Punjabi 'pan' model & hOCR parsing
         final hocr = await FlutterTesseractOcr.extractHocr(tmpFile.path, language: 'pan');
         final reg = RegExp(
-          r"<span[^>]+class=['\"][^'\"]*ocrx_word[^'\"]*['\"][^>]+title=['\"][^'\"]*bbox\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)[^'\"]*['\"][^>]*>([^<]+)</span>",
+          r'''<span[^>]+class=['"][^'"]*ocrx_word[^'"]*['"][^>]+title=['"][^'"]*bbox\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)[^'"]*['"][^>]*>([^<]+)</span>''',
           caseSensitive: false,
         );
         for (final m in reg.allMatches(hocr)) {
@@ -88,7 +87,6 @@ class _InPlaceSelectableOcrScreenState extends State<InPlaceSelectableOcrScreen>
           }
         }
       } else {
-        // Google ML Kit for English (Latin) and Hindi (Devanagari)
         final recognizer = UniversalFormatConverterEngine.createRecognizer(_lang);
         try {
           final recognized = await recognizer.processImage(InputImage.fromFilePath(tmpFile.path));
