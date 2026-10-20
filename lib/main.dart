@@ -7,7 +7,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart';
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
@@ -546,6 +545,214 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
         ),
       ),
     );
+  }
+
+  void _openUniversalConverterHub() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        height: MediaQuery.of(context).size.height * 0.84,
+        decoration: const BoxDecoration(color: kWhitePure, borderRadius: BorderRadius.vertical(top: Radius.circular(26))),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(child: Container(width: 44, height: 5, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(4)))),
+            const SizedBox(height: 14),
+            const Text('Universal Format Converter Hub', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: kNavyPrimary)),
+            const Divider(height: 24),
+            Expanded(
+              child: GridView.count(
+                crossAxisCount: 2,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                childAspectRatio: 1.38,
+                children: [
+                  _buildConverterCard(ctx, title: 'PDF → Image', sub: 'Export PDF to JPG/PNG', icon: Icons.collections_bookmark_outlined, badgeColor: kBlueAccent, direction: ConversionDirection.pdfToImage),
+                  _buildConverterCard(ctx, title: 'Image → PDF', sub: 'Compile photos into PDF', icon: Icons.picture_as_pdf_outlined, badgeColor: kNavyPrimary, direction: ConversionDirection.imageToPdf),
+                  _buildConverterCard(ctx, title: 'PDF → Word', sub: 'Convert PDF to .DOCX', icon: Icons.description_outlined, badgeColor: const Color(0xFF1D4ED8), direction: ConversionDirection.pdfToWord),
+                  _buildConverterCard(ctx, title: 'Word → PDF', sub: 'Convert .DOCX to PDF', icon: Icons.article_outlined, badgeColor: const Color(0xFF0284C7), direction: ConversionDirection.wordToPdf),
+                  _buildConverterCard(ctx, title: 'PDF → Excel', sub: 'Extract tables to .XLSX', icon: Icons.grid_on_rounded, badgeColor: const Color(0xFF15803D), direction: ConversionDirection.pdfToExcel),
+                  _buildConverterCard(ctx, title: 'Excel → PDF', sub: 'Turn .XLSX grid into PDF', icon: Icons.table_chart_outlined, badgeColor: const Color(0xFF0D9488), direction: ConversionDirection.excelToPdf),
+                  _buildConverterCard(ctx, title: 'Word → Excel', sub: 'Convert .DOCX to .XLSX', icon: Icons.swap_horiz_rounded, badgeColor: const Color(0xFF4F46E5), direction: ConversionDirection.wordToExcel),
+                  _buildConverterCard(ctx, title: 'Excel → Word', sub: 'Format .XLSX into .DOCX', icon: Icons.transform_rounded, badgeColor: const Color(0xFF0369A1), direction: ConversionDirection.excelToWord),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildConverterCard(BuildContext sheetContext, {required String title, required String sub, required IconData icon, required Color badgeColor, required ConversionDirection direction}) {
+    return InkWell(
+      onTap: () {
+        Navigator.pop(sheetContext);
+        _executeConversionWorkflow(direction);
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(color: kBlueIceBg, borderRadius: BorderRadius.circular(16), border: Border.all(color: badgeColor.withOpacity(0.28), width: 1.2)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: badgeColor, size: 24),
+            const SizedBox(height: 8),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: kNavyPrimary)),
+            Text(sub, style: const TextStyle(fontSize: 11, color: kSlateMuted), maxLines: 1),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _executeConversionWorkflow(ConversionDirection dir) async {
+    if (dir == ConversionDirection.imageToPdf) {
+      await _launchGoogleAiDocumentScanner(galleryImport: true);
+      return;
+    }
+
+    List<String> allowedExts = ['pdf'];
+    if (dir == ConversionDirection.wordToPdf || dir == ConversionDirection.wordToExcel) {
+      allowedExts = ['docx', 'txt'];
+    } else if (dir == ConversionDirection.excelToPdf || dir == ConversionDirection.excelToWord) {
+      allowedExts = ['xlsx', 'xls', 'csv'];
+    }
+
+    final picked = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: allowedExts);
+    if (picked == null || picked.files.single.path == null) return;
+
+    final srcPath = picked.files.single.path!;
+    final baseName = p.basenameWithoutExtension(srcPath);
+    final ext = p.extension(srcPath).replaceAll('.', '').toUpperCase();
+    final rawBytes = await File(srcPath).readAsBytes();
+    final vaultDir = await _getAccountVaultDir();
+
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(color: kBlueAccent),
+            SizedBox(width: 16),
+            Expanded(child: Text('Converting document format...')),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      String? createdFilePath;
+      String createdExt = 'PDF';
+
+      switch (dir) {
+        case ConversionDirection.pdfToImage:
+          int pNum = 1;
+          await for (final page in Printing.raster(rawBytes, dpi: 200)) {
+            final png = await page.toPng();
+            final pPath = p.join(vaultDir.path, '${baseName}_Page_$pNum.png');
+            await File(pPath).writeAsBytes(png);
+            createdFilePath ??= pPath;
+            createdExt = 'PNG';
+            pNum++;
+          }
+          break;
+        case ConversionDirection.pdfToWord:
+          final lines = await UniversalFormatConverterEngine.extractOcrLinesFromPdf(rawBytes, _defaultOcrLang);
+          final docx = UniversalFormatConverterEngine.buildDocxBytes(title: baseName, paragraphs: lines);
+          createdFilePath = p.join(vaultDir.path, '${baseName}_Converted.docx');
+          createdExt = 'DOCX';
+          await File(createdFilePath).writeAsBytes(docx);
+          break;
+        case ConversionDirection.wordToPdf:
+          final lines = await UniversalFormatConverterEngine.extractLinesFromDocx(rawBytes);
+          final pdf = pw.Document();
+          pdf.addPage(
+            pw.MultiPage(
+              pageFormat: PdfPageFormat.a4,
+              margin: const pw.EdgeInsets.all(32),
+              build: (_) => [
+                pw.Header(level: 0, child: pw.Text(baseName, style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold))),
+                ...lines.map((l) => pw.Padding(padding: const pw.EdgeInsets.only(bottom: 6), child: pw.Text(l, style: const pw.TextStyle(fontSize: 11)))),
+              ],
+            ),
+          );
+          createdFilePath = p.join(vaultDir.path, '${baseName}_WordToPdf.pdf');
+          createdExt = 'PDF';
+          await File(createdFilePath).writeAsBytes(await pdf.save());
+          break;
+        case ConversionDirection.pdfToExcel:
+          final lines = await UniversalFormatConverterEngine.extractOcrLinesFromPdf(rawBytes, _defaultOcrLang);
+          final List<List<String>> rows = lines.map((l) => l.split(RegExp(r'\s{2,}|\t')).map((e) => e.trim()).toList()).toList();
+          final xlsxBytes = UniversalFormatConverterEngine.buildExcelBytes(rows, sheetName: 'PDF_Table');
+          createdFilePath = p.join(vaultDir.path, '${baseName}_Table.xlsx');
+          createdExt = 'XLSX';
+          await File(createdFilePath).writeAsBytes(xlsxBytes);
+          break;
+        case ConversionDirection.excelToPdf:
+          final rows = UniversalFormatConverterEngine.extractRowsFromExcelOrCsv(rawBytes, ext);
+          final pdf = pw.Document();
+          pdf.addPage(
+            pw.MultiPage(
+              pageFormat: PdfPageFormat.a4,
+              margin: const pw.EdgeInsets.all(24),
+              build: (_) => [
+                pw.Header(level: 0, child: pw.Text('Spreadsheet Report: $baseName', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                pw.TableHelper.fromTextArray(data: rows.take(250).toList(), cellStyle: const pw.TextStyle(fontSize: 9), headerStyle: pw.TextStyle(fontSize: 9.5, fontWeight: pw.FontWeight.bold)),
+              ],
+            ),
+          );
+          createdFilePath = p.join(vaultDir.path, '${baseName}_Sheet.pdf');
+          createdExt = 'PDF';
+          await File(createdFilePath).writeAsBytes(await pdf.save());
+          break;
+        case ConversionDirection.wordToExcel:
+          final lines = await UniversalFormatConverterEngine.extractLinesFromDocx(rawBytes);
+          final rows = lines.map((l) => l.split(RegExp(r'\s{2,}|\t|,')).map((c) => c.trim()).toList()).toList();
+          final xlsxBytes = UniversalFormatConverterEngine.buildExcelBytes(rows, sheetName: 'From_Word');
+          createdFilePath = p.join(vaultDir.path, '${baseName}_FromWord.xlsx');
+          createdExt = 'XLSX';
+          await File(createdFilePath).writeAsBytes(xlsxBytes);
+          break;
+        case ConversionDirection.excelToWord:
+          final rows = UniversalFormatConverterEngine.extractRowsFromExcelOrCsv(rawBytes, ext);
+          final docxBytes = UniversalFormatConverterEngine.buildDocxBytes(title: baseName, paragraphs: [], tableData: rows);
+          createdFilePath = p.join(vaultDir.path, '${baseName}_FromExcel.docx');
+          createdExt = 'DOCX';
+          await File(createdFilePath).writeAsBytes(docxBytes);
+          break;
+        case ConversionDirection.imageToPdf:
+          break;
+      }
+
+      await _reloadVault();
+      if (mounted) Navigator.pop(context);
+
+      if (createdFilePath != null && mounted) {
+        final stat = await File(createdFilePath).stat();
+        _openVaultFile(
+          VaultFile(
+            name: p.basename(createdFilePath),
+            path: createdFilePath,
+            ext: createdExt,
+            modified: stat.modified,
+            sizeBytes: stat.size,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Conversion error: $e'), backgroundColor: Colors.red));
+      }
+    }
   }
 
   void _openAiFeaturesFolderModal() {
@@ -1107,6 +1314,13 @@ class _ANOfficeMasterShellState extends State<ANOfficeMasterShell> {
               sub: '.XLSX, Legacy .XLS & CSV',
               accent: const Color(0xFF0D9488),
               onTap: _importExternalFilePicker,
+            ),
+            _buildStudioToolTile(
+              icon: Icons.hub_outlined,
+              title: 'Format Converter Hub',
+              sub: 'PDF ⇄ Word ⇄ Excel ⇄ Image',
+              accent: const Color(0xFF0284C7),
+              onTap: _openUniversalConverterHub,
             ),
           ],
         ),
