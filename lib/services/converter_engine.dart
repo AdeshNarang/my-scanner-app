@@ -17,7 +17,8 @@ import '../models/document_models.dart';
 class UniversalFormatConverterEngine {
   static TextRecognizer createRecognizer(OcrLanguageMode mode) {
     if (mode == OcrLanguageMode.hindiDevanagari) {
-      return TextRecognizer(script: TextRecognitionScript.devanagari);
+      // In google_mlkit_text_recognition, the enum is spelled 'devanagiri'
+      return TextRecognizer(script: TextRecognitionScript.devanagiri);
     }
     return TextRecognizer(script: TextRecognitionScript.latin);
   }
