@@ -49,6 +49,11 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
   late TextEditingController _titleCtrl;
   bool _processing = false;
 
+  // Mode: Zoom & Pan vs. Edit & Draw
+  bool _isZoomAndPanMode = false;
+  final TransformationController _transCtrl = TransformationController();
+
+  // Eyedropper & Eraser
   bool _eyedropperSamplingMode = false;
   Offset? _eyedropperTouchPos;
   Color _sampledPaperColor = const Color(0xFFF5F3EB);
@@ -56,6 +61,7 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
   double _eraserBrushSize = 22.0;
   img.Image? _cachedDecodedCurrentPage;
 
+  // Active Selections
   int? _selectedOverlayIdx;
   int? _selectedAnnotationIdx;
 
@@ -65,6 +71,12 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
     _pages = List.from(widget.initialPages);
     _quality = widget.defaultQuality;
     _titleCtrl = TextEditingController(text: widget.initialTitle);
+  }
+
+  @override
+  void dispose() {
+    _transCtrl.dispose();
+    super.dispose();
   }
 
   EditableDocumentPage get _currentPage => _pages[_currentIndex];
@@ -118,9 +130,13 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
             Row(
               children: [
                 Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(shape: BoxShape.circle, color: _sampledPaperColor, border: Border.all(color: Colors.black26, width: 2)),
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _sampledPaperColor,
+                    border: Border.all(color: Colors.black26, width: 2),
+                  ),
                 ),
                 const SizedBox(width: 14),
                 Column(
@@ -139,7 +155,10 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                   child: OutlinedButton(
                     onPressed: () {
                       Navigator.pop(ctx);
-                      setState(() => _eyedropperSamplingMode = true);
+                      setState(() {
+                        _eyedropperSamplingMode = true;
+                        _isZoomAndPanMode = false;
+                      });
                     },
                     child: const Text('Resample Color'),
                   ),
@@ -150,8 +169,13 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                     style: FilledButton.styleFrom(backgroundColor: kBlueAccent),
                     onPressed: () {
                       Navigator.pop(ctx);
-                      setState(() => _brushEraserActive = true);
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Color locked! Paint on page to erase blemishes.')));
+                      setState(() {
+                        _brushEraserActive = true;
+                        _isZoomAndPanMode = false;
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Color locked! Paint on page to erase blemishes.')),
+                      );
                     },
                     child: const Text('Confirm & Use Color'),
                   ),
@@ -172,6 +196,7 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
     setState(() {
       _currentPage.overlayImages.add(OverlayImageItem(bytes: bytes));
       _selectedOverlayIdx = _currentPage.overlayImages.length - 1;
+      _isZoomAndPanMode = false;
     });
   }
 
@@ -189,7 +214,11 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              TextField(controller: txtCtrl, autofocus: true, decoration: const InputDecoration(labelText: 'Enter Text', border: OutlineInputBorder())),
+              TextField(
+                controller: txtCtrl,
+                autofocus: true,
+                decoration: const InputDecoration(labelText: 'Enter Text', border: OutlineInputBorder()),
+              ),
               const SizedBox(height: 14),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -198,7 +227,7 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                   Text('${chosenSize.round()} pt', style: const TextStyle(fontWeight: FontWeight.bold, color: kBlueAccent)),
                 ],
               ),
-              Slider(value: chosenSize, min: 10, max: 44, activeColor: kBlueAccent, onChanged: (v) => setModal(() => chosenSize = v)),
+              Slider(value: chosenSize, min: 10, max: 48, activeColor: kBlueAccent, onChanged: (v) => setModal(() => chosenSize = v)),
             ],
           ),
           actions: [
@@ -209,9 +238,16 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                 if (txtCtrl.text.trim().isNotEmpty) {
                   setState(() {
                     _currentPage.annotations.add(
-                      PageAnnotationItem(type: 'text', text: txtCtrl.text.trim(), fontSize: chosenSize, color: chosenColor, normalizedPos: const Offset(0.45, 0.45)),
+                      PageAnnotationItem(
+                        type: 'text',
+                        text: txtCtrl.text.trim(),
+                        fontSize: chosenSize,
+                        color: chosenColor,
+                        normalizedPos: const Offset(0.45, 0.45),
+                      ),
                     );
                     _selectedAnnotationIdx = _currentPage.annotations.length - 1;
+                    _isZoomAndPanMode = false;
                   });
                 }
                 Navigator.pop(ctx);
@@ -246,7 +282,11 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
               Expanded(
                 child: Container(
                   width: double.infinity,
-                  decoration: BoxDecoration(color: const Color(0xFFF1F5F9), border: Border.all(color: Colors.grey.shade400), borderRadius: BorderRadius.circular(12)),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    border: Border.all(color: Colors.grey.shade400),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   child: GestureDetector(
                     onPanUpdate: (d) => setModal(() => points.add(d.localPosition)),
                     onPanEnd: (_) => setModal(() => points.add(null)),
@@ -283,6 +323,7 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
         _currentPage.annotations.add(
           PageAnnotationItem(type: 'signature', normalizedPos: const Offset(0.65, 0.80), signaturePng: sigBytes),
         );
+        _isZoomAndPanMode = false;
       });
     }
   }
@@ -295,7 +336,11 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
         content: const Text('You have unsaved edits on this document. Do you really want to leave?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep Editing')),
-          FilledButton(style: FilledButton.styleFrom(backgroundColor: Colors.red), onPressed: () => Navigator.pop(ctx, true), child: const Text('Discard')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Discard'),
+          ),
         ],
       ),
     );
@@ -365,7 +410,11 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                     return pw.Positioned(
                       left: ann.normalizedPos.dx * pageW,
                       top: ann.normalizedPos.dy * pageH,
-                      child: pw.Image(pw.MemoryImage(ann.signaturePng!), width: 130, height: 60),
+                      child: pw.SizedBox(
+                        width: 130,
+                        height: 60,
+                        child: pw.Image(pw.MemoryImage(ann.signaturePng!), fit: pw.BoxFit.contain),
+                      ),
                     );
                   }
                   return pw.Positioned(
@@ -373,7 +422,11 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                     top: ann.normalizedPos.dy * pageH,
                     child: pw.Text(
                       ann.text,
-                      style: pw.TextStyle(color: PdfColor.fromInt(ann.color.value), fontSize: ann.fontSize, fontWeight: pw.FontWeight.bold),
+                      style: pw.TextStyle(
+                        color: PdfColor.fromInt(ann.color.value),
+                        fontSize: ann.fontSize,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
                     ),
                   );
                 }),
@@ -386,7 +439,9 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
       final finalBytes = await pdf.save();
       await widget.onSaveDocument(finalBytes, _titleCtrl.text.trim());
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saved PDF to Vault!'), backgroundColor: Color(0xFF15803D)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Saved PDF to Vault!'), backgroundColor: Color(0xFF15803D)),
+        );
         Navigator.pop(context);
       }
     } finally {
@@ -410,6 +465,30 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
           backgroundColor: kNavyPrimary,
           title: Text('Page ${_currentIndex + 1} of ${_pages.length}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: kWhitePure)),
           actions: [
+            // Floating Mode Switcher: Zoom & Pan vs. Edit & Draw
+            ActionChip(
+              backgroundColor: _isZoomAndPanMode ? kBlueAccent : kNavySecondary,
+              side: BorderSide(color: _isZoomAndPanMode ? kWhitePure : Colors.white24),
+              avatar: Icon(_isZoomAndPanMode ? Icons.zoom_in : Icons.edit, color: kWhitePure, size: 16),
+              label: Text(
+                _isZoomAndPanMode ? 'Zoom Mode' : 'Edit Mode',
+                style: const TextStyle(color: kWhitePure, fontWeight: FontWeight.bold, fontSize: 12),
+              ),
+              onPressed: () {
+                setState(() {
+                  _isZoomAndPanMode = !_isZoomAndPanMode;
+                  _brushEraserActive = false;
+                  _eyedropperSamplingMode = false;
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    duration: const Duration(milliseconds: 1400),
+                    content: Text(_isZoomAndPanMode ? 'Zoom Mode Active: Pinch & pan freely.' : 'Edit Mode Active: Tap and place text/edits.'),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(width: 6),
             IconButton(
               tooltip: 'Overlay Secondary Image',
               icon: const Icon(Icons.add_photo_alternate_outlined, color: kWhitePure),
@@ -429,7 +508,12 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                     child: TextField(
                       controller: _titleCtrl,
                       style: const TextStyle(color: kWhitePure, fontWeight: FontWeight.bold, fontSize: 14),
-                      decoration: const InputDecoration(labelText: 'PDF Document Name', labelStyle: TextStyle(color: kBlueLight, fontSize: 11), isDense: true, border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                        labelText: 'PDF Document Name',
+                        labelStyle: TextStyle(color: kBlueLight, fontSize: 11),
+                        isDense: true,
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -439,14 +523,27 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                         _eyedropperSamplingMode = true;
                         _brushEraserActive = false;
                         _eyedropperTouchPos = null;
+                        _isZoomAndPanMode = false;
                       });
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      decoration: BoxDecoration(color: _eyedropperSamplingMode ? kBlueAccent : kNavyPrimary, borderRadius: BorderRadius.circular(10), border: Border.all(color: kWhitePure.withOpacity(0.4))),
+                      decoration: BoxDecoration(
+                        color: _eyedropperSamplingMode ? kBlueAccent : kNavyPrimary,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: kWhitePure.withOpacity(0.4)),
+                      ),
                       child: Row(
                         children: [
-                          Container(width: 18, height: 18, decoration: BoxDecoration(color: _sampledPaperColor, shape: BoxShape.circle, border: Border.all(color: kWhitePure, width: 1.5))),
+                          Container(
+                            width: 18,
+                            height: 18,
+                            decoration: BoxDecoration(
+                              color: _sampledPaperColor,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: kWhitePure, width: 1.5),
+                            ),
+                          ),
                           const SizedBox(width: 6),
                           const Icon(Icons.colorize, size: 16, color: kWhitePure),
                           const SizedBox(width: 4),
@@ -466,29 +563,44 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                   children: [
                     const Text('Eraser Size:', style: TextStyle(color: kWhitePure, fontSize: 12)),
                     Expanded(
-                      child: Slider(value: _eraserBrushSize, min: 8, max: 55, activeColor: kBlueAccent, onChanged: (v) => setState(() => _eraserBrushSize = v)),
+                      child: Slider(
+                        value: _eraserBrushSize,
+                        min: 8,
+                        max: 60,
+                        activeColor: kBlueAccent,
+                        onChanged: (v) => setState(() => _eraserBrushSize = v),
+                      ),
                     ),
                     IconButton(
                       tooltip: 'Undo',
                       icon: const Icon(Icons.undo, color: kWhitePure, size: 18),
                       onPressed: _currentPage.eraserStrokes.isEmpty ? null : () => setState(() => _currentPage.eraserStrokes.removeLast()),
                     ),
-                    TextButton(onPressed: () => setState(() => _brushEraserActive = false), child: const Text('Done', style: TextStyle(color: kBlueLight, fontWeight: FontWeight.bold))),
+                    TextButton(
+                      onPressed: () => setState(() => _brushEraserActive = false),
+                      child: const Text('Done', style: TextStyle(color: kBlueLight, fontWeight: FontWeight.bold)),
+                    ),
                   ],
                 ),
               ),
             Expanded(
               child: PageView.builder(
-                physics: (_brushEraserActive || _eyedropperSamplingMode || _selectedOverlayIdx != null) ? const NeverScrollableScrollPhysics() : const BouncingScrollPhysics(),
+                physics: (_isZoomAndPanMode || _brushEraserActive || _eyedropperSamplingMode || _selectedOverlayIdx != null)
+                    ? const NeverScrollableScrollPhysics()
+                    : const BouncingScrollPhysics(),
                 itemCount: _pages.length,
-                onPageChanged: (i) => setState(() => _currentIndex = i),
+                onPageChanged: (i) => setState(() {
+                  _currentIndex = i;
+                  _transCtrl.value = Matrix4.identity();
+                }),
                 itemBuilder: (_, pageIdx) {
                   final page = _pages[pageIdx];
                   return InteractiveViewer(
-                    panEnabled: !_brushEraserActive && !_eyedropperSamplingMode && _selectedOverlayIdx == null,
-                    scaleEnabled: true,
+                    transformationController: _transCtrl,
+                    panEnabled: _isZoomAndPanMode,
+                    scaleEnabled: _isZoomAndPanMode,
                     minScale: 1.0,
-                    maxScale: 5.0,
+                    maxScale: 8.0,
                     child: Center(
                       child: Padding(
                         padding: const EdgeInsets.all(12),
@@ -500,38 +612,46 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                               final boxH = constraints.maxHeight;
 
                               return GestureDetector(
-                                onPanStart: (d) {
-                                  if (_eyedropperSamplingMode) {
-                                    final norm = Offset((d.localPosition.dx / boxW).clamp(0.0, 1.0), (d.localPosition.dy / boxH).clamp(0.0, 1.0));
-                                    setState(() => _eyedropperTouchPos = d.localPosition);
-                                    _samplePixelColorLive(norm);
-                                  } else if (_brushEraserActive) {
-                                    final norm = Offset((d.localPosition.dx / boxW).clamp(0.0, 1.0), (d.localPosition.dy / boxH).clamp(0.0, 1.0));
-                                    setState(() {
-                                      page.eraserStrokes.add(BlemishEraserStroke(normalizedPoints: [norm], sampledColor: _sampledPaperColor, strokeWidth: _eraserBrushSize));
-                                    });
-                                  }
-                                },
-                                onPanUpdate: (d) {
-                                  if (_eyedropperSamplingMode) {
-                                    final norm = Offset((d.localPosition.dx / boxW).clamp(0.0, 1.0), (d.localPosition.dy / boxH).clamp(0.0, 1.0));
-                                    setState(() => _eyedropperTouchPos = d.localPosition);
-                                    _samplePixelColorLive(norm);
-                                  } else if (_brushEraserActive) {
-                                    if (page.eraserStrokes.isEmpty) return;
-                                    final norm = Offset((d.localPosition.dx / boxW).clamp(0.0, 1.0), (d.localPosition.dy / boxH).clamp(0.0, 1.0));
-                                    setState(() => page.eraserStrokes.last.normalizedPoints.add(norm));
-                                  }
-                                },
-                                onPanEnd: (_) {
-                                  if (_eyedropperSamplingMode) {
-                                    setState(() {
-                                      _eyedropperSamplingMode = false;
-                                      _eyedropperTouchPos = null;
-                                    });
-                                    _showEyedropperConfirmationGate();
-                                  }
-                                },
+                                onPanStart: _isZoomAndPanMode
+                                    ? null
+                                    : (d) {
+                                        if (_eyedropperSamplingMode) {
+                                          final norm = Offset((d.localPosition.dx / boxW).clamp(0.0, 1.0), (d.localPosition.dy / boxH).clamp(0.0, 1.0));
+                                          setState(() => _eyedropperTouchPos = d.localPosition);
+                                          _samplePixelColorLive(norm);
+                                        } else if (_brushEraserActive) {
+                                          final norm = Offset((d.localPosition.dx / boxW).clamp(0.0, 1.0), (d.localPosition.dy / boxH).clamp(0.0, 1.0));
+                                          setState(() {
+                                            page.eraserStrokes.add(
+                                              BlemishEraserStroke(normalizedPoints: [norm], sampledColor: _sampledPaperColor, strokeWidth: _eraserBrushSize),
+                                            );
+                                          });
+                                        }
+                                      },
+                                onPanUpdate: _isZoomAndPanMode
+                                    ? null
+                                    : (d) {
+                                        if (_eyedropperSamplingMode) {
+                                          final norm = Offset((d.localPosition.dx / boxW).clamp(0.0, 1.0), (d.localPosition.dy / boxH).clamp(0.0, 1.0));
+                                          setState(() => _eyedropperTouchPos = d.localPosition);
+                                          _samplePixelColorLive(norm);
+                                        } else if (_brushEraserActive) {
+                                          if (page.eraserStrokes.isEmpty) return;
+                                          final norm = Offset((d.localPosition.dx / boxW).clamp(0.0, 1.0), (d.localPosition.dy / boxH).clamp(0.0, 1.0));
+                                          setState(() => page.eraserStrokes.last.normalizedPoints.add(norm));
+                                        }
+                                      },
+                                onPanEnd: _isZoomAndPanMode
+                                    ? null
+                                    : (_) {
+                                        if (_eyedropperSamplingMode) {
+                                          setState(() {
+                                            _eyedropperSamplingMode = false;
+                                            _eyedropperTouchPos = null;
+                                          });
+                                          _showEyedropperConfirmationGate();
+                                        }
+                                      },
                                 child: Stack(
                                   fit: StackFit.expand,
                                   children: [
@@ -545,12 +665,14 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                                         top: ov.normalizedPos.dy * boxH,
                                         child: GestureDetector(
                                           onTap: () => setState(() => _selectedOverlayIdx = ovIdx),
-                                          onPanUpdate: (d) => setState(() {
-                                            ov.normalizedPos = Offset(
-                                              (ov.normalizedPos.dx + d.delta.dx / boxW).clamp(0.0, 1.0 - ov.normalizedWidth),
-                                              (ov.normalizedPos.dy + d.delta.dy / boxH).clamp(0.0, 1.0 - ov.normalizedHeight),
-                                            );
-                                          }),
+                                          onPanUpdate: _isZoomAndPanMode
+                                              ? null
+                                              : (d) => setState(() {
+                                                    ov.normalizedPos = Offset(
+                                                      (ov.normalizedPos.dx + d.delta.dx / boxW).clamp(0.0, 1.0 - ov.normalizedWidth),
+                                                      (ov.normalizedPos.dy + d.delta.dy / boxH).clamp(0.0, 1.0 - ov.normalizedHeight),
+                                                    );
+                                                  }),
                                           child: Stack(
                                             children: [
                                               Container(
@@ -581,6 +703,32 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                                         ),
                                       );
                                     }),
+                                    ...List.generate(page.annotations.length, (annIdx) {
+                                      final ann = page.annotations[annIdx];
+                                      final isSelected = _selectedAnnotationIdx == annIdx;
+                                      return Positioned(
+                                        left: ann.normalizedPos.dx * boxW - 30,
+                                        top: ann.normalizedPos.dy * boxH - 14,
+                                        child: GestureDetector(
+                                          onTap: () => setState(() => _selectedAnnotationIdx = annIdx),
+                                          onPanUpdate: _isZoomAndPanMode
+                                              ? null
+                                              : (d) => setState(() {
+                                                    ann.normalizedPos = Offset(
+                                                      (ann.normalizedPos.dx + d.delta.dx / boxW).clamp(0.05, 0.95),
+                                                      (ann.normalizedPos.dy + d.delta.dy / boxH).clamp(0.05, 0.95),
+                                                    );
+                                                  }),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: isSelected ? BoxDecoration(border: Border.all(color: kBlueAccent, width: 1.5)) : null,
+                                            child: ann.type == 'signature' && ann.signaturePng != null
+                                                ? Image.memory(ann.signaturePng!, width: 130, height: 60)
+                                                : Text(ann.text, style: TextStyle(color: ann.color, fontSize: ann.fontSize, fontWeight: FontWeight.bold)),
+                                          ),
+                                        ),
+                                      );
+                                    }),
                                     if (_eyedropperSamplingMode && _eyedropperTouchPos != null)
                                       Positioned(
                                         left: (_eyedropperTouchPos!.dx - 40).clamp(10.0, boxW - 90.0),
@@ -588,7 +736,12 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                                         child: Container(
                                           width: 80,
                                           height: 80,
-                                          decoration: BoxDecoration(shape: BoxShape.circle, color: _sampledPaperColor, border: Border.all(color: kWhitePure, width: 4), boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 4))]),
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: _sampledPaperColor,
+                                            border: Border.all(color: kWhitePure, width: 4),
+                                            boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 4))],
+                                          ),
                                           child: Stack(
                                             alignment: Alignment.center,
                                             children: [
@@ -640,7 +793,15 @@ class _AcrobatDocumentStudioScreenState extends State<AcrobatDocumentStudioScree
                     child: Row(
                       children: [
                         _studioActionBtn(icon: Icons.text_fields_rounded, label: 'Add Text', onTap: _openAddCustomTextDialog),
-                        _studioActionBtn(icon: Icons.brush_outlined, label: _brushEraserActive ? 'Eraser ON' : 'Color Eraser', isActive: _brushEraserActive, onTap: () => setState(() => _brushEraserActive = !_brushEraserActive)),
+                        _studioActionBtn(
+                          icon: Icons.brush_outlined,
+                          label: _brushEraserActive ? 'Eraser ON' : 'Color Eraser',
+                          isActive: _brushEraserActive,
+                          onTap: () => setState(() {
+                            _brushEraserActive = !_brushEraserActive;
+                            _isZoomAndPanMode = false;
+                          }),
+                        ),
                         _studioActionBtn(
                           icon: Icons.crop_free,
                           label: '8-Handle Crop',
