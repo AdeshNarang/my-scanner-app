@@ -1,50 +1,49 @@
 name: an_office
-description: AN Office - Executive Document Reader, Scanner, Office Suite & Converter by Adesh Narang.
-publish_to: 'none'
-version: 10.0.0+30
+description: "AN Office - Executive Document Workstation & AI Studio"
+publish_to: "none"
+version: 10.0.3+33
 
 environment:
-  sdk: '>=3.2.0 <4.0.0'
+  sdk: ">=3.4.0 <4.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
 
-  # 100% Accurate Google AI Document Edge Scanner & Multilingual OCR
-  google_mlkit_document_scanner: ^0.2.1
-  google_mlkit_text_recognition: ^0.13.0
-
-  # Google Drive Cloud Sync & OAuth
-  google_sign_in: ^6.2.1
-  http: ^1.2.2
-
-  # PDF Reader, Compiler & High-Speed Rasterizer
+  # Document Generation & Formats
   pdf: ^3.11.1
   printing: ^5.13.2
-
-  # Camera, Gallery, Pixel Manipulation & Compression
-  image_picker: ^1.1.2
-  flutter_image_compress: ^2.3.0
-  image: ^4.2.0
-
-  # Native-Style Office Engines (Excel .xlsx & Word .docx)
-  excel: ^4.0.3
-  archive: ^3.4.10
+  excel: ^4.0.6
+  archive: ^3.6.1
   xml: ^6.5.0
 
-  # File System, Sharing & Utilities
-  path_provider: ^2.1.4
-  path: ^1.9.0
-  share_plus: ^10.0.2
-  file_picker: ^8.0.0
+  # AI & Vision
+  google_mlkit_document_scanner: ^0.2.0
+  google_mlkit_text_recognition: ^0.13.0
+
+  # Image & File Processing
+  image: ^4.2.0
+  flutter_image_compress: ^2.3.0
+  image_picker: ^1.1.2
+  file_picker: ^8.1.4
   open_filex: ^4.5.0
+  share_plus: ^10.1.1
+  path: ^1.9.0
+  path_provider: ^2.1.4
+
+  # Connectivity & Storage
+  google_sign_in: ^6.2.1
+  http: ^1.2.2
   shared_preferences: ^2.3.2
-  intl: ^0.19.0
   url_launcher: ^6.3.0
+
+  # Utilities
+  intl: ^0.19.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_lints: ^4.0.0
 
 flutter:
   uses-material-design: true
