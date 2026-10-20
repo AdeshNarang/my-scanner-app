@@ -25,22 +25,34 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Scaffold Clean Android Project & Preserve Entire Lib
+      - name: Scaffold Clean Android Project & Preserve Lib & Assets
         run: |
           cp pubspec.yaml /tmp/pubspec.yaml
           cp -r lib /tmp/lib_backup
-          if [ -f "assets/logo.png" ]; then
-            cp assets/logo.png /tmp/user_logo.png
+          if [ -d "assets" ]; then
+            cp -r assets /tmp/assets_backup
           fi
           rm -rf android ios test web linux macos windows pubspec.lock .dart_tool
           flutter create --platforms=android --org com.adeshnarang --project-name an_office .
-          mkdir -p assets
+          mkdir -p assets/tessdata
           cp /tmp/pubspec.yaml pubspec.yaml
           rm -rf lib
           cp -r /tmp/lib_backup lib
-          if [ -f "/tmp/user_logo.png" ]; then
-            cp /tmp/user_logo.png assets/logo.png
+          if [ -d "/tmp/assets_backup" ]; then
+            cp -r /tmp/assets_backup/* assets/ || true
           fi
+
+      - name: Download Tesseract Punjabi (Gurmukhi) Model
+        run: |
+          mkdir -p assets/tessdata
+          curl -L -o assets/tessdata/pan.traineddata https://github.com/tesseract-ocr/tessdata_fast/raw/main/pan.traineddata
+          cat << 'EOF' > assets/tessdata_config.json
+          {
+            "files": [
+              "pan.traineddata"
+            ]
+          }
+          EOF
 
       - name: Generate Permanent Keystore & Print SHA-1 Fingerprint
         run: |
@@ -195,8 +207,10 @@ jobs:
           cat << 'EOF' > android/app/proguard-rules.pro
           -keep class com.google.mlkit.** { *; }
           -keep class com.google.android.gms.** { *; }
+          -keep class com.googlecode.tesseract.android.** { *; }
           -dontwarn com.google.mlkit.**
           -dontwarn com.google.android.gms.**
+          -dontwarn com.googlecode.tesseract.android.**
           EOF
 
           cat << 'EOF' > android/app/build.gradle
@@ -233,8 +247,8 @@ jobs:
                   applicationId = "com.adeshnarang.an_office"
                   minSdk = 24
                   targetSdk = 35
-                  versionCode = 35
-                  versionName = "10.0.5"
+                  versionCode = 36
+                  versionName = "10.0.6"
                   multiDexEnabled = true
               }
 
