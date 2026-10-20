@@ -25,10 +25,10 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Scaffold Clean Android Project & Preserve Source
+      - name: Scaffold Clean Android Project & Preserve Entire Lib
         run: |
           cp pubspec.yaml /tmp/pubspec.yaml
-          cp lib/main.dart /tmp/main.dart
+          cp -r lib /tmp/lib_backup
           if [ -f "assets/logo.png" ]; then
             cp assets/logo.png /tmp/user_logo.png
           fi
@@ -36,12 +36,13 @@ jobs:
           flutter create --platforms=android --org com.adeshnarang --project-name an_office .
           mkdir -p assets
           cp /tmp/pubspec.yaml pubspec.yaml
-          cp /tmp/main.dart lib/main.dart
+          rm -rf lib
+          cp -r /tmp/lib_backup lib
           if [ -f "/tmp/user_logo.png" ]; then
             cp /tmp/user_logo.png assets/logo.png
           fi
 
-      - name: Generate Permanent Release Keystore & Print SHA-1 Fingerprint
+      - name: Generate Permanent Keystore & Print SHA-1 Fingerprint
         run: |
           mkdir -p android/app
           keytool -genkey -v -keystore android/app/release.keystore -alias anoffice -keyalg RSA -keysize 2048 -validity 10000 \
@@ -52,7 +53,7 @@ jobs:
           keytool -list -v -keystore android/app/release.keystore -alias anoffice -storepass "anoffice123" | grep "SHA1:"
           echo "=========================================================="
 
-      - name: Generate AN Office Classical Crest Logo & Mipmaps
+      - name: Generate Classical Crest Logo & Android Mipmaps
         run: |
           sudo apt-get update -y && sudo apt-get install -y python3-pil
           python3 - << 'EOF'
@@ -82,11 +83,9 @@ jobs:
               draw.polygon([(176, 138), (118, 306), (146, 306), (190, 170)], fill=charcoal)
               draw.polygon([(176, 138), (238, 306), (210, 306), (168, 170)], fill=charcoal)
               draw.rectangle([138, 240, 212, 256], fill=pewter)
-
               draw.rectangle([258, 150, 282, 308], fill=charcoal)
               draw.polygon([(258, 150), (284, 150), (380, 286), (356, 308)], fill=charcoal)
               draw.rectangle([358, 150, 380, 308], fill=charcoal)
-
               base_img.save("assets/logo.png")
 
           sizes = {"mipmap-mdpi": 48, "mipmap-hdpi": 72, "mipmap-xhdpi": 96, "mipmap-xxhdpi": 144, "mipmap-xxxhdpi": 192}
@@ -234,8 +233,8 @@ jobs:
                   applicationId = "com.adeshnarang.an_office"
                   minSdk = 24
                   targetSdk = 35
-                  versionCode = 34
-                  versionName = "10.0.4"
+                  versionCode = 35
+                  versionName = "10.0.5"
                   multiDexEnabled = true
               }
 
