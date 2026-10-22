@@ -198,6 +198,16 @@ jobs:
           -dontwarn com.googlecode.tesseract.android.**
           EOF
 
+          cat << 'EOF' > android/build.gradle
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+                  maven { url 'https://repo.maven.apache.org/maven2' }
+              }
+          }
+          EOF
+
           cat << 'EOF' > android/app/build.gradle
           plugins {
               id "com.android.application"
@@ -232,8 +242,8 @@ jobs:
                   applicationId = "com.adeshnarang.an_office"
                   minSdk = 24
                   targetSdk = 35
-                  versionCode = 38
-                  versionName = "10.0.8"
+                  versionCode = 39
+                  versionName = "10.0.9"
                   multiDexEnabled = true
               }
 
