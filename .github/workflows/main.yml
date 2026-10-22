@@ -206,6 +206,18 @@ jobs:
                   maven { url 'https://repo.maven.apache.org/maven2' }
               }
           }
+
+          rootProject.buildDir = "../build"
+          subprojects {
+              project.buildDir = "${rootProject.buildDir}/${project.name}"
+          }
+          subprojects {
+              project.evaluationDependsOn(":app")
+          }
+
+          tasks.register("clean", Delete) {
+              delete rootProject.buildDir
+          }
           EOF
 
           cat << 'EOF' > android/app/build.gradle
@@ -345,7 +357,15 @@ jobs:
         run: |
           flutter clean
           flutter pub get
-          flutter build apk --release --no-shrink
+          # Run Gradle build directly via Flutter CLI
+          flutter build apk --release --no-shrink || (cd android && ./gradlew assembleRelease --no-daemon)
+          # Guarantee the output APK is in the expected artifact path
+          mkdir -p build/app/outputs/flutter-apk
+          APK_FOUND=$(find . -name "*release*.apk" -type f | head -n 1)
+          if [ -n "$APK_FOUND" ]; then
+            echo "Located compiled APK at: $APK_FOUND"
+            cp "$APK_FOUND" build/app/outputs/flutter-apk/app-release.apk
+          fi
 
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
