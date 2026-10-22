@@ -19,6 +19,7 @@ import 'screens/compressor_studio.dart';
 import 'screens/converter_screen.dart';
 import 'screens/crop_studio.dart';
 import 'screens/excel_studio.dart';
+import 'screens/ocr_editor.dart';
 import 'screens/ocr_studio.dart';
 import 'screens/pdf_reader.dart';
 import 'screens/pdf_studio.dart';
@@ -158,7 +159,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _runCamScanner() async {
     try {
       final options = DocumentScannerOptions(
-        documentFormats: [DocumentFormat.pdf, DocumentFormat.jpeg],
         mode: ScannerMode.full,
         isGalleryImport: true,
         pageLimit: 20,
@@ -440,7 +440,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: kWhitePure,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: kBorderSubtle),
-                  boxShadow: const [BoxShadow(color: Colors.black05, blurRadius: 10, offset: Offset(0, 4))],
+                  boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4))],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
