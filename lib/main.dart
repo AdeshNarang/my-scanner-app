@@ -8,12 +8,16 @@ import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'models/document_models.dart';
 import 'screens/ai_hub.dart';
-import 'screens/compressor_screen.dart';
+import 'screens/compressor_studio.dart';
 import 'screens/converter_screen.dart';
+import 'screens/crop_studio.dart';
 import 'screens/excel_studio.dart';
 import 'screens/ocr_studio.dart';
 import 'screens/pdf_reader.dart';
@@ -113,6 +117,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final name = f.path.toLowerCase();
         return name.endsWith('.pdf') ||
             name.endsWith('.docx') ||
+            name.endsWith('.doc') ||
             name.endsWith('.xlsx') ||
             name.endsWith('.xls') ||
             name.endsWith('.csv') ||
@@ -170,10 +175,9 @@ class _HomeScreenState extends State<HomeScreen> {
         if (mounted) _dispatchFileOpening(p.join((await getApplicationDocumentsDirectory()).path, 'vault', fileName));
       } else if (images.isNotEmpty) {
         final imgBytes = await File(images.first).readAsBytes();
-        final pdfBytes = UniversalFormatConverterEngine.buildExcelBytes([]); // Fallback builder
-        // Or route directly into PDF studio with scanned images
+        final decoded = await decodeImageFromList(imgBytes);
         final docPages = [
-          EditableDocumentPage(originalBytes: imgBytes, displayBytes: imgBytes, imageWidth: 1200, imageHeight: 1600)
+          EditableDocumentPage(originalBytes: imgBytes, displayBytes: imgBytes, imageWidth: decoded.width, imageHeight: decoded.height)
         ];
         if (mounted) {
           Navigator.push(
@@ -267,7 +271,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     } else {
-      // Images & WebP
       if (!mounted) return;
       final bytes = await File(filePath).readAsBytes();
       final decoded = await decodeImageFromList(bytes);
@@ -339,16 +342,12 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       if (picked != null && picked.files.isNotEmpty) {
         if (picked.files.length == 1 && picked.files.single.path != null) {
-          // Splitter mode
           _dispatchFileOpening(picked.files.single.path!);
         } else {
-          // Merger mode
           final pdf = pw.Document();
           for (final f in picked.files) {
             if (f.path != null) {
               final bytes = await File(f.path!).readAsBytes();
-              final loadedDoc = pw.Document();
-              // Read pages via printing raster
               await for (final raster in Printing.raster(bytes, dpi: 150)) {
                 final png = await raster.toPng();
                 pdf.addPage(
@@ -434,7 +433,6 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Clean Status Banner with CamScanner & Open File buttons
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(18),
@@ -507,7 +505,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: kSlateMuted, letterSpacing: 0.8),
               ),
               const SizedBox(height: 12),
-              // Clean 2x3 Core Tools Grid
               GridView.count(
                 crossAxisCount: 2,
                 shrinkWrap: true,
