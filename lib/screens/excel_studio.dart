@@ -157,7 +157,7 @@ class _NativeExcelSpreadsheetStudioState extends State<NativeExcelSpreadsheetStu
           ),
           IconButton(
             tooltip: 'Add Column Right',
-            icon: const Icon(Icons.add_column_right, color: kBlueAccent),
+            icon: const Icon(Icons.view_column, color: kBlueAccent),
             onPressed: _addColumnRight,
           ),
           IconButton(
@@ -180,7 +180,6 @@ class _NativeExcelSpreadsheetStudioState extends State<NativeExcelSpreadsheetStu
       body: Column(
         children: [
           if (_processing) const LinearProgressIndicator(color: kBlueAccent),
-          // Formula Bar / Cell Editor Header
           Container(
             color: kWhitePure,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -218,7 +217,6 @@ class _NativeExcelSpreadsheetStudioState extends State<NativeExcelSpreadsheetStu
               ],
             ),
           ),
-          // 2D Spreadsheet Grid
           Expanded(
             child: InteractiveViewer(
               minScale: 0.5,
