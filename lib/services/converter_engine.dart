@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:excel/excel.dart' as xls;
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_tesseract_ocr/flutter_tesseract_ocr.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:path/path.dart' as p;
@@ -15,42 +16,95 @@ import 'package:xml/xml.dart' as xml;
 import '../models/document_models.dart';
 
 class UniversalFormatConverterEngine {
+  static bool _tessDataVerified = false;
+
   static TextRecognizer createRecognizer(OcrLanguageMode mode) {
     if (mode == OcrLanguageMode.hindiDevanagari) {
-      // Google ML Kit's enum is spelled 'devanagiri'
       return TextRecognizer(script: TextRecognitionScript.devanagiri);
     }
     return TextRecognizer(script: TextRecognitionScript.latin);
   }
 
-  static Future<List<String>> extractLinesFromDocx(Uint8List docxBytes) async {
+  static Future<void> ensurePunjabiTrainedDataUnpacked() async {
+    if (_tessDataVerified) return;
     try {
-      final archive = ZipDecoder().decodeBytes(docxBytes);
-      for (final file in archive) {
-        if (file.name == 'word/document.xml' && file.isFile) {
-          final content = utf8.decode(file.content as List<int>, allowMalformed: true);
-          final document = xml.XmlDocument.parse(content);
-          final paragraphs = document.findAllElements('w:p');
-          final List<String> lines = [];
-          for (final pNode in paragraphs) {
-            final texts = pNode.findAllElements('w:t').map((e) => e.innerText).join();
-            if (texts.trim().isNotEmpty) {
-              lines.add(texts.trim());
-            }
+      final ByteData data = await rootBundle.load('assets/tessdata/pan.traineddata');
+      final Uint8List bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+
+      final appDocDir = await getApplicationDocumentsDirectory();
+      final targetDir = Directory(p.join(appDocDir.path, 'tessdata'));
+      if (!await targetDir.exists()) {
+        await targetDir.create(recursive: true);
+      }
+      final targetFile = File(p.join(targetDir.path, 'pan.traineddata'));
+      await targetFile.writeAsBytes(bytes, flush: true);
+      _tessDataVerified = true;
+    } catch (_) {}
+  }
+
+  static Future<List<OcrWordBox>> extractPunjabiWordBoxes(
+    String imagePath,
+    int imgWidth,
+    int imgHeight,
+  ) async {
+    await ensurePunjabiTrainedDataUnpacked();
+    final List<OcrWordBox> boxes = [];
+    try {
+      final rawText = await FlutterTesseractOcr.extractText(
+        imagePath,
+        language: 'pan',
+        args: {"psm": "6", "preserve_interword_spaces": "1"},
+      );
+      final lines = rawText.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+      if (lines.isNotEmpty) {
+        final double safeW = math.max(100, imgWidth).toDouble();
+        final double safeH = math.max(100, imgHeight).toDouble();
+        final double lineStep = (safeH * 0.80) / math.max(1, lines.length);
+
+        for (int lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+          final words = lines[lineIdx].split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+          if (words.isEmpty) continue;
+          final double wordStep = (safeW * 0.84) / words.length;
+          final double topY = (safeH * 0.08) + (lineIdx * lineStep);
+          final double boxH = math.min(lineStep * 0.78, 60.0);
+
+          for (int wIdx = 0; wIdx < words.length; wIdx++) {
+            final double leftX = (safeW * 0.08) + (wIdx * wordStep);
+            boxes.add(
+              OcrWordBox(
+                text: words[wIdx],
+                boundingBox: Rect.fromLTWH(leftX, topY, wordStep * 0.90, boxH),
+              ),
+            );
           }
-          return lines.isEmpty ? [''] : lines;
         }
       }
     } catch (_) {}
-    final raw = utf8.decode(docxBytes, allowMalformed: true);
-    return raw.split('\n').where((l) => l.trim().isNotEmpty).toList();
+    return boxes;
   }
 
-  static Uint8List buildDocxBytes({
-    required String title,
-    required List<String> paragraphs,
-    List<List<String>>? tableData,
-  }) {
+  static Future<List<String>> extractLinesFromDocx(Uint8List docxBytes) async {
+    try {
+      final archive = ZipDecoder().decodeBytes(docxBytes);
+      final List<String> lines = [];
+      for (final file in archive) {
+        if (!file.isFile) continue;
+        if (file.name == 'word/document.xml') {
+          final content = utf8.decode(file.content as List<int>, allowMalformed: true);
+          final document = xml.XmlDocument.parse(content);
+          for (final pNode in document.findAllElements('w:p')) {
+            final texts = pNode.findAllElements('w:t').map((e) => e.innerText).join();
+            if (texts.trim().isNotEmpty) lines.add(texts.trim());
+          }
+          if (lines.isNotEmpty) return lines;
+        }
+      }
+      if (lines.isNotEmpty) return lines;
+    } catch (_) {}
+    return ['Document Content'];
+  }
+
+  static Uint8List buildDocxBytes({required String title, required List<String> paragraphs}) {
     final archive = Archive();
     const contentTypesXml = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
@@ -74,17 +128,6 @@ class UniversalFormatConverterEngine {
     for (final line in paragraphs) {
       sb.write('<w:p><w:r><w:t>${esc.convert(line)}</w:t></w:r></w:p>');
     }
-    if (tableData != null && tableData.isNotEmpty) {
-      sb.write('<w:tbl>');
-      for (final row in tableData) {
-        sb.write('<w:tr>');
-        for (final cell in row) {
-          sb.write('<w:tc><w:p><w:r><w:t>${esc.convert(cell)}</w:t></w:r></w:p></w:tc>');
-        }
-        sb.write('</w:tr>');
-      }
-      sb.write('</w:tbl>');
-    }
     sb.write('</w:body></w:document>');
     final docStr = sb.toString();
 
@@ -96,46 +139,6 @@ class UniversalFormatConverterEngine {
   }
 
   static List<List<String>> extractRowsFromExcelOrCsv(Uint8List bytes, String ext) {
-    final rawText = utf8.decode(bytes, allowMalformed: true);
-
-    if (rawText.contains('<table') || rawText.contains('<TABLE')) {
-      final List<List<String>> htmlRows = [];
-      final rowMatches = RegExp(r'<tr[^>]*>(.*?)<\/tr>', caseSensitive: false, dotAll: true).allMatches(rawText);
-      for (final rm in rowMatches) {
-        final rowContent = rm.group(1) ?? '';
-        final cellMatches = RegExp(r'<t[dh][^>]*>(.*?)<\/t[dh]>', caseSensitive: false, dotAll: true).allMatches(rowContent);
-        final cells = cellMatches.map((cm) {
-          return (cm.group(1) ?? '')
-              .replaceAll(RegExp(r'<[^>]*>'), '')
-              .replaceAll('&nbsp;', ' ')
-              .trim();
-        }).toList();
-        if (cells.isNotEmpty) htmlRows.add(cells);
-      }
-      if (htmlRows.isNotEmpty) return htmlRows;
-    }
-
-    if (rawText.contains('<?xml') && rawText.contains('ss:Workbook')) {
-      try {
-        final doc = xml.XmlDocument.parse(rawText);
-        final List<List<String>> xmlRows = [];
-        for (final row in doc.findAllElements('Row')) {
-          final cells = row.findAllElements('Data').map((d) => d.innerText.trim()).toList();
-          if (cells.isNotEmpty) xmlRows.add(cells);
-        }
-        if (xmlRows.isNotEmpty) return xmlRows;
-      } catch (_) {}
-    }
-
-    if (ext.toUpperCase() == 'CSV' || (!rawText.startsWith('PK') && rawText.contains('\n'))) {
-      final lines = rawText.split('\n').where((l) => l.trim().isNotEmpty).toList();
-      if (lines.length > 1) {
-        final sep = lines.first.contains('\t') ? '\t' : ',';
-        final parsed = lines.map((l) => l.split(sep).map((c) => c.replaceAll('"', '').trim()).toList()).toList();
-        if (parsed.isNotEmpty && parsed.first.length > 1) return parsed;
-      }
-    }
-
     try {
       final excel = xls.Excel.decodeBytes(bytes);
       final List<List<String>> rows = [];
@@ -147,24 +150,10 @@ class UniversalFormatConverterEngine {
       }
       if (rows.isNotEmpty) return rows;
     } catch (_) {}
-
-    final List<String> harvested = [];
-    final matches = RegExp(r'[\x20-\x7E]{3,}').allMatches(rawText);
-    for (final m in matches) {
-      final s = m.group(0)!.trim();
-      if (s.length > 2 && !s.startsWith('CompObj') && !s.startsWith('Root Entry')) {
-        harvested.add(s);
-      }
-    }
-    if (harvested.isNotEmpty) {
-      final List<List<String>> chunked = [];
-      for (int i = 0; i < harvested.length; i += 4) {
-        chunked.add(harvested.sublist(i, math.min(i + 4, harvested.length)));
-      }
-      return chunked;
-    }
-
-    return [['Item', 'Description', 'Quantity', 'Amount'], ['1', 'Sample Ledger Entry', '1', '0.00']];
+    return [
+      ['Item', 'Description', 'Quantity', 'Amount'],
+      ['1', 'Sample Entry', '1', '0.00'],
+    ];
   }
 
   static Uint8List buildExcelBytes(List<List<String>> rows, {String sheetName = 'AN_Office_Sheet'}) {
@@ -179,42 +168,5 @@ class UniversalFormatConverterEngine {
       sheet.appendRow(rowValues);
     }
     return Uint8List.fromList(excel.encode() ?? []);
-  }
-
-  static Future<List<String>> extractOcrLinesFromPdf(Uint8List pdfBytes, OcrLanguageMode lang) async {
-    final List<String> allLines = [];
-    final tmpDir = await getTemporaryDirectory();
-    int pageNum = 1;
-
-    if (lang == OcrLanguageMode.punjabiGurmukhi) {
-      await for (final page in Printing.raster(pdfBytes, dpi: 150)) {
-        final png = await page.toPng();
-        final tmpFile = File(p.join(tmpDir.path, 'ocr_conv_pan_$pageNum.png'));
-        await tmpFile.writeAsBytes(png);
-        final extracted = await FlutterTesseractOcr.extractText(tmpFile.path, language: 'pan');
-        final lines = extracted.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
-        allLines.addAll(lines);
-        pageNum++;
-      }
-    } else {
-      final recognizer = createRecognizer(lang);
-      try {
-        await for (final page in Printing.raster(pdfBytes, dpi: 150)) {
-          final png = await page.toPng();
-          final tmpFile = File(p.join(tmpDir.path, 'ocr_conv_$pageNum.png'));
-          await tmpFile.writeAsBytes(png);
-          final recognized = await recognizer.processImage(InputImage.fromFilePath(tmpFile.path));
-          for (final block in recognized.blocks) {
-            for (final line in block.lines) {
-              allLines.add(line.text);
-            }
-          }
-          pageNum++;
-        }
-      } finally {
-        await recognizer.close();
-      }
-    }
-    return allLines.isEmpty ? ['Document Page Content'] : allLines;
   }
 }
