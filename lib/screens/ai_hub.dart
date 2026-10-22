@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'ocr_studio.dart';
 
 const Color kNavyPrimary = Color(0xFF0F172A);
 const Color kBlueAccent = Color(0xFF2563EB);
@@ -25,16 +24,7 @@ class AiStudioHubScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Text('AI & OCR EXTRACTION TOOLS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: kSlateMuted, letterSpacing: 0.8)),
-          const SizedBox(height: 12),
-          _buildHubCard(
-            context,
-            icon: Icons.translate_rounded,
-            title: 'Trilingual OCR Studio',
-            subtitle: 'Extract text in English, Hindi, and Punjabi Gurmukhi',
-            color: const Color(0xFF0D9488),
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TrilingualOcrStudioScreen())),
-          ),
+          const Text('AI & OCR TOOLS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: kSlateMuted, letterSpacing: 0.8)),
           const SizedBox(height: 12),
           _buildHubCard(
             context,
@@ -44,7 +34,7 @@ class AiStudioHubScreen extends StatelessWidget {
             color: const Color(0xFFD97706),
             onTap: () {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Invoice extractor ready. Select an invoice via CamScanner.')),
+                const SnackBar(content: Text('Use CamScanner from dashboard to scan invoices.')),
               );
             },
           ),
