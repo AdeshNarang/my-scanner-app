@@ -15,12 +15,10 @@ import 'package:share_plus/share_plus.dart';
 
 import 'models/document_models.dart';
 import 'screens/ai_hub.dart';
-import 'screens/compressor_studio.dart';
 import 'screens/converter_screen.dart';
 import 'screens/crop_studio.dart';
 import 'screens/excel_studio.dart';
 import 'screens/ocr_editor.dart';
-import 'screens/ocr_studio.dart';
 import 'screens/pdf_reader.dart';
 import 'screens/pdf_studio.dart';
 import 'screens/word_studio.dart';
@@ -377,6 +375,26 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (_) {}
   }
 
+  Future<void> _openOcrPicker() async {
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (picked == null) return;
+    final bytes = await File(picked.path).readAsBytes();
+    final decoded = await decodeImageFromList(bytes);
+
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => InPlaceSelectableOcrScreen(
+          imageBytes: bytes,
+          imageWidth: decoded.width,
+          imageHeight: decoded.height,
+          initialLang: OcrLanguageMode.english,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final filteredFiles = _searchQuery.isEmpty
@@ -525,7 +543,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: 'Compress Doc',
                     subtitle: 'Quality & size tuner',
                     color: const Color(0xFF15803D),
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DocumentCompressorScreen())),
+                    onTap: _pickAndOpenAnyDocument,
                   ),
                   _buildCoreToolCard(
                     icon: Icons.menu_book_rounded,
@@ -546,7 +564,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: 'Trilingual OCR',
                     subtitle: 'English, Hindi, Punjabi',
                     color: const Color(0xFF0D9488),
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TrilingualOcrStudioScreen())),
+                    onTap: _openOcrPicker,
                   ),
                   _buildCoreToolCard(
                     icon: Icons.call_merge_rounded,
