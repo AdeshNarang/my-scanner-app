@@ -5,7 +5,6 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_tesseract_ocr/flutter_tesseract_ocr.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
@@ -67,25 +66,15 @@ class _InPlaceSelectableOcrScreenState extends State<InPlaceSelectableOcrScreen>
     final tmpFile = File(p.join(tmpDir.path, 'inplace_ocr_tmp.png'));
     await tmpFile.writeAsBytes(_workingImageBytes);
 
-    final List<OcrWordBox> boxes = [];
+    List<OcrWordBox> boxes = [];
 
     try {
       if (_lang == OcrLanguageMode.punjabiGurmukhi) {
-        final hocr = await FlutterTesseractOcr.extractHocr(tmpFile.path, language: 'pan');
-        final reg = RegExp(
-          r'''<span[^>]+class=['"][^'"]*ocrx_word[^'"]*['"][^>]+title=['"][^'"]*bbox\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)[^'"]*['"][^>]*>([^<]+)</span>''',
-          caseSensitive: false,
+        boxes = await UniversalFormatConverterEngine.extractPunjabiWordBoxes(
+          tmpFile.path,
+          widget.imageWidth,
+          widget.imageHeight,
         );
-        for (final m in reg.allMatches(hocr)) {
-          final x1 = double.tryParse(m.group(1) ?? '0') ?? 0;
-          final y1 = double.tryParse(m.group(2) ?? '0') ?? 0;
-          final x2 = double.tryParse(m.group(3) ?? '0') ?? 0;
-          final y2 = double.tryParse(m.group(4) ?? '0') ?? 0;
-          final text = (m.group(5) ?? '').trim();
-          if (text.isNotEmpty) {
-            boxes.add(OcrWordBox(text: text, boundingBox: Rect.fromLTRB(x1, y1, x2, y2)));
-          }
-        }
       } else {
         final recognizer = UniversalFormatConverterEngine.createRecognizer(_lang);
         try {
@@ -198,16 +187,18 @@ class _InPlaceSelectableOcrScreenState extends State<InPlaceSelectableOcrScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kNavyPrimary,
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        backgroundColor: kNavyPrimary,
+        backgroundColor: kWhitePure,
+        foregroundColor: kNavyPrimary,
+        elevation: 0.5,
         title: TextField(
-          style: const TextStyle(color: kWhitePure, fontSize: 14.5),
+          style: const TextStyle(color: kNavyPrimary, fontSize: 14.5),
           decoration: const InputDecoration(
             hintText: 'Search or tap word to edit...',
-            hintStyle: TextStyle(color: Colors.white60, fontSize: 13),
+            hintStyle: TextStyle(color: Colors.black45, fontSize: 13),
             border: InputBorder.none,
-            prefixIcon: Icon(Icons.search, color: kBlueLight, size: 18),
+            prefixIcon: Icon(Icons.search, color: kBlueAccent, size: 18),
           ),
           onChanged: (v) {
             setState(() {
@@ -226,7 +217,7 @@ class _InPlaceSelectableOcrScreenState extends State<InPlaceSelectableOcrScreen>
         actions: [
           PopupMenuButton<OcrLanguageMode>(
             tooltip: 'Switch OCR Language',
-            icon: const Icon(Icons.translate, color: kBlueLight),
+            icon: const Icon(Icons.translate, color: kBlueAccent),
             onSelected: (m) {
               setState(() => _lang = m);
               _performInPlaceOcr();
@@ -235,7 +226,7 @@ class _InPlaceSelectableOcrScreenState extends State<InPlaceSelectableOcrScreen>
           ),
           IconButton(
             tooltip: 'Save In-Photo Edits',
-            icon: const Icon(Icons.check, color: kWhitePure),
+            icon: const Icon(Icons.check, color: kBlueAccent),
             onPressed: () => Navigator.pop(context, _workingImageBytes),
           ),
         ],
@@ -281,8 +272,8 @@ class _InPlaceSelectableOcrScreenState extends State<InPlaceSelectableOcrScreen>
                                 }),
                                 child: Container(
                                   decoration: BoxDecoration(
-                                    color: isSelected ? kBlueAccent.withOpacity(0.42) : kWhitePure.withOpacity(0.14),
-                                    border: Border.all(color: isSelected ? kWhitePure : kBlueAccent.withOpacity(0.55), width: isSelected ? 1.6 : 0.7),
+                                    color: isSelected ? kBlueAccent.withOpacity(0.42) : kBlueAccent.withOpacity(0.10),
+                                    border: Border.all(color: isSelected ? kBlueAccent : kBlueAccent.withOpacity(0.55), width: isSelected ? 1.8 : 0.8),
                                     borderRadius: BorderRadius.circular(2),
                                   ),
                                 ),
@@ -299,15 +290,20 @@ class _InPlaceSelectableOcrScreenState extends State<InPlaceSelectableOcrScreen>
           ),
           Container(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-            color: kNavySecondary,
+            decoration: const BoxDecoration(
+              color: kWhitePure,
+              border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+            ),
             child: Row(
               children: [
                 Expanded(
                   child: Text(
-                    _selectedIndices.isEmpty ? 'Tap any word to edit in photo. Long press to copy.' : 'Selected: $_selectedTextString',
+                    _selectedIndices.isEmpty
+                        ? 'Language: ${_lang.label} • Tap word to edit, long press to copy.'
+                        : 'Selected: $_selectedTextString',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: kWhitePure, fontSize: 12.5),
+                    style: const TextStyle(color: kNavyPrimary, fontSize: 12.5, fontWeight: FontWeight.w600),
                   ),
                 ),
                 if (_selectedIndices.isNotEmpty)
