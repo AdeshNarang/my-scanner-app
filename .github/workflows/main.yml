@@ -29,8 +29,9 @@ jobs:
         run: |
           cp pubspec.yaml /tmp/pubspec.yaml
           cp -r lib /tmp/lib_backup
+          mkdir -p /tmp/assets_backup
           if [ -d "assets" ]; then
-            cp -r assets /tmp/assets_backup
+            cp -r assets/* /tmp/assets_backup/ || true
           fi
           rm -rf android ios test web linux macos windows pubspec.lock .dart_tool
           flutter create --platforms=android --org com.adeshnarang --project-name an_office .
@@ -38,9 +39,7 @@ jobs:
           cp /tmp/pubspec.yaml pubspec.yaml
           rm -rf lib
           cp -r /tmp/lib_backup lib
-          if [ -d "/tmp/assets_backup" ]; then
-            cp -r /tmp/assets_backup/* assets/ || true
-          fi
+          cp -r /tmp/assets_backup/* assets/ || true
 
       - name: Download Tesseract Punjabi (Gurmukhi) Model
         run: |
@@ -65,42 +64,28 @@ jobs:
           keytool -list -v -keystore android/app/release.keystore -alias anoffice -storepass "anoffice123" | grep "SHA1:"
           echo "=========================================================="
 
-      - name: Generate Classical Crest Logo & Android Mipmaps
+      - name: Generate Launcher Mipmaps Strictly From User Logo
         run: |
           sudo apt-get update -y && sudo apt-get install -y python3-pil
           python3 - << 'EOF'
           import os
-          from PIL import Image, ImageDraw
+          from PIL import Image
 
-          if os.path.exists("assets/logo.png"):
-              base_img = Image.open("assets/logo.png").convert("RGBA")
-              base_img = base_img.resize((512, 512), Image.Resampling.LANCZOS)
+          logo_path = "assets/logo.png"
+          if os.path.exists(logo_path):
+              base_img = Image.open(logo_path).convert("RGBA")
           else:
-              size = 512
-              base_img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-              draw = ImageDraw.Draw(base_img)
-              ivory = (242, 239, 233, 255)
-              charcoal = (45, 42, 38, 255)
-              pewter = (95, 90, 84, 255)
+              base_img = Image.new("RGBA", (512, 512), (15, 23, 42, 255))
+              os.makedirs("assets", exist_ok=True)
+              base_img.save(logo_path)
 
-              draw.rounded_rectangle([14, 14, size-14, size-14], radius=98, fill=ivory, outline=pewter, width=5)
-              cx, cy = size // 2, size // 2
-              r_out, r_in = 208, 196
-              draw.ellipse([cx - r_out, cy - r_out, cx + r_out, cy + r_out], outline=charcoal, width=4)
-              draw.ellipse([cx - r_in, cy - r_in, cx + r_in, cy + r_in], outline=pewter, width=2)
-
-              for pt in [(cx, cy - r_out - 6), (cx, cy + r_out + 6), (cx - r_out - 6, cy), (cx + r_out + 6, cy)]:
-                  draw.ellipse([pt[0]-9, pt[1]-9, pt[0]+9, pt[1]+9], fill=charcoal)
-
-              draw.polygon([(176, 138), (118, 306), (146, 306), (190, 170)], fill=charcoal)
-              draw.polygon([(176, 138), (238, 306), (210, 306), (168, 170)], fill=charcoal)
-              draw.rectangle([138, 240, 212, 256], fill=pewter)
-              draw.rectangle([258, 150, 282, 308], fill=charcoal)
-              draw.polygon([(258, 150), (284, 150), (380, 286), (356, 308)], fill=charcoal)
-              draw.rectangle([358, 150, 380, 308], fill=charcoal)
-              base_img.save("assets/logo.png")
-
-          sizes = {"mipmap-mdpi": 48, "mipmap-hdpi": 72, "mipmap-xhdpi": 96, "mipmap-xxhdpi": 144, "mipmap-xxxhdpi": 192}
+          sizes = {
+              "mipmap-mdpi": 48,
+              "mipmap-hdpi": 72,
+              "mipmap-xhdpi": 96,
+              "mipmap-xxhdpi": 144,
+              "mipmap-xxxhdpi": 192
+          }
           for folder, px in sizes.items():
               out_dir = f"android/app/src/main/res/{folder}"
               os.makedirs(out_dir, exist_ok=True)
@@ -247,8 +232,8 @@ jobs:
                   applicationId = "com.adeshnarang.an_office"
                   minSdk = 24
                   targetSdk = 35
-                  versionCode = 36
-                  versionName = "10.0.6"
+                  versionCode = 38
+                  versionName = "10.0.8"
                   multiDexEnabled = true
               }
 
@@ -315,11 +300,14 @@ jobs:
                           <data android:mimeType="application/pdf" />
                           <data android:mimeType="text/plain" />
                           <data android:mimeType="text/csv" />
+                          <data android:mimeType="text/tab-separated-values" />
                           <data android:mimeType="image/*" />
                           <data android:mimeType="application/msword" />
                           <data android:mimeType="application/vnd.ms-excel" />
+                          <data android:mimeType="application/vnd.ms-powerpoint" />
                           <data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
                           <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+                          <data android:mimeType="application/vnd.openxmlformats-officedocument.presentationml.presentation" />
                       </intent-filter>
 
                       <intent-filter>
@@ -327,6 +315,9 @@ jobs:
                           <category android:name="android.intent.category.DEFAULT" />
                           <data android:mimeType="application/pdf" />
                           <data android:mimeType="image/*" />
+                          <data android:mimeType="text/plain" />
+                          <data android:mimeType="text/csv" />
+                          <data android:mimeType="application/msword" />
                           <data android:mimeType="application/vnd.ms-excel" />
                           <data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
                           <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
